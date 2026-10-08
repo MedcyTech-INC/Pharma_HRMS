@@ -129,7 +129,14 @@ export async function bulkCreateVisits(visits: Partial<FieldVisit>[]): Promise<v
     assigned_address: visit.assignedAddress,
     status: 'ASSIGNED',
     priority: 'normal',
-    allowed_radius_meters: 500
+    allowed_radius_meters: 500,
+    category: visit.category || 'doctor',
+    doctor_name: visit.doctorName || null,
+    clinic_name: visit.clinicName || null,
+    chemist_shop_name: visit.chemistShopName || null,
+    stockist_name: visit.stockistName || null,
+    hospital_name: visit.hospitalName || null,
+    visit_purpose: visit.visitPurpose || null
   }));
 
   const { error } = await supabase
@@ -228,6 +235,28 @@ export async function updateVisitStatus(
         const arrTime = new Date(existing.arrived_at).getTime();
         const compTime = new Date(now).getTime();
         updatePayload.duration_minutes = Math.round((compTime - arrTime) / 60000);
+      }
+      
+      // NEW: Create Notification for RSM
+      try {
+        const { data: empData } = await supabase
+          .from('pharma_hrms_employees')
+          .select('name, reporting_to')
+          .eq('id', employeeId)
+          .single();
+          
+        if (empData && empData.reporting_to) {
+          await supabase.from('pharma_hrms_notifications').insert([{
+            recipient_id: empData.reporting_to,
+            sender_id: employeeId,
+            title: 'Visit Completed',
+            message: `${empData.name} submitted the report for ${existing.doctor_name || 'a doctor'}`,
+            type: 'visit_submitted',
+            reference_id: visitId
+          }]);
+        }
+      } catch (err) {
+        console.warn('Failed to send notification:', err);
       }
       break;
 

@@ -11,11 +11,11 @@ interface BulkAssignModalProps {
 }
 
 interface ParsedRow {
- employeeId: string;
- name: string;
- doctorName: string;
- hospitalAddress: string;
- workDesc: string;
+ employeeEmail: string;
+ category: any;
+ targetName: string;
+ address: string;
+ purpose: string;
  date: string;
  timeSlot: string;
 }
@@ -70,15 +70,19 @@ export default function BulkAssignModal({ onClose, employees, adminId }: BulkAss
      return new Date().toISOString().split('T')[0];
     };
 
-    const mappedData: ParsedRow[] = data.map(row => ({
-     employeeId: String(row['employee id'] || row['Employee ID'] || row['employeeId'] || row['EmployeeId'] || '').trim(),
-     name: String(row['name'] || row['Name'] || '').trim(),
-     doctorName: String(row['doctor name'] || row['Doctor Name'] || row['doctorName'] || '').trim(),
-     hospitalAddress: String(row['hospital address'] || row['Hospital Address'] || row['hospitalAddress'] || '').trim(),
-     workDesc: String(row['work desc'] || row['Work Desc'] || row['Work Description'] || row['Description'] || '').trim(),
-     date: formatExcelDate(row['date'] || row['Date']),
-     timeSlot: String(row['time slot'] || row['Time Slot'] || '09:00').trim(),
-    })).filter(r => r.employeeId && r.doctorName); // basic validation
+    const mappedData: ParsedRow[] = data.map(row => {
+     const email = String(row['employee email'] || row['Employee Email'] || row['email'] || row['Email'] || '').trim().toLowerCase();
+     const cat = String(row['category'] || row['Category'] || 'doctor').trim().toLowerCase();
+     return {
+      employeeEmail: email,
+      category: ['doctor', 'chemist', 'stockist', 'hospital'].includes(cat) ? cat : 'doctor',
+      targetName: String(row['target name'] || row['Target Name'] || row['Name'] || '').trim(),
+      address: String(row['visit location'] || row['Visit Location'] || row['address'] || row['Address'] || '').trim(),
+      purpose: String(row['purpose'] || row['Purpose'] || '').trim(),
+      date: formatExcelDate(row['call date'] || row['Call Date'] || row['date'] || row['Date']),
+      timeSlot: String(row['time'] || row['Time'] || row['time slot'] || row['Time Slot'] || '09:00').trim(),
+     };
+    }).filter(r => r.employeeEmail && r.targetName); // basic validation
 
     setParsedData(mappedData);
     setError('');
@@ -99,15 +103,26 @@ export default function BulkAssignModal({ onClose, employees, adminId }: BulkAss
   setIsUploading(true);
   try {
    await fieldVisitService.bulkCreateVisits(
-    parsedData.map(row => ({
-     employeeId: row.employeeId,
-     assignedBy: adminId || 'admin',
-     title: `Visit: ${row.doctorName}`,
-     description: row.workDesc,
-     assignedAddress: row.hospitalAddress,
-     scheduledDate: row.date,
-     scheduledStart: row.timeSlot
-    }))
+    parsedData.map(row => {
+     // Look up employee ID by email
+     const empId = employees.find(e => e.email.toLowerCase() === row.employeeEmail)?.id || row.employeeEmail;
+     return {
+      employeeId: empId,
+      assignedBy: adminId || 'admin',
+      title: `Visit: ${row.targetName}`,
+      description: row.purpose,
+      assignedAddress: row.address,
+      scheduledDate: row.date,
+      scheduledStart: row.timeSlot,
+      category: row.category,
+      visitPurpose: row.purpose,
+      // Map Target Name to the correct field based on category
+      doctorName: row.category === 'doctor' ? row.targetName : undefined,
+      chemistShopName: row.category === 'chemist' ? row.targetName : undefined,
+      stockistName: row.category === 'stockist' ? row.targetName : undefined,
+      hospitalName: row.category === 'hospital' ? row.targetName : undefined,
+     };
+    })
    );
    onClose();
   } catch (err: any) {
@@ -118,16 +133,21 @@ export default function BulkAssignModal({ onClose, employees, adminId }: BulkAss
   }
  };
 
- const downloadTemplate = () => {
-  const ws = xlsx.utils.json_to_sheet([{
-   'Employee ID': 'EMP-001',
-   'Name': 'John Doe',
-   'Doctor Name': 'Dr. Smith',
-   'Hospital Address': '123 Health St, City',
-   'Work Desc': 'Monthly product detailing',
-   'Date': '2026-09-10',
-   'Time Slot': '10:30'
-  }]);
+  const downloadTemplate = () => {
+  const headers = [
+    ['Employee Email', 'Category', 'Target Name', 'Visit Location', 'Purpose', 'Call Date', 'Time']
+  ];
+  const ws = xlsx.utils.aoa_to_sheet(headers);
+  // Optional: Set column widths
+  ws['!cols'] = [
+    { wch: 25 }, // Email
+    { wch: 12 }, // Category
+    { wch: 25 }, // Target Name
+    { wch: 30 }, // Address
+    { wch: 20 }, // Purpose
+    { wch: 12 }, // Date
+    { wch: 10 }  // Time Slot
+  ];
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, 'Template');
   xlsx.writeFile(wb, 'Bulk_Assign_Template.xlsx');
@@ -160,7 +180,7 @@ export default function BulkAssignModal({ onClose, employees, adminId }: BulkAss
          {file ? file.name : 'Click to Upload Excel (.xlsx)'}
         </span>
         <span className="text-xs text-teal-600/70 mt-1 font-medium">
-         {parsedData.length > 0 ? `${parsedData.length} valid rows found` : 'Columns: Employee ID, Name, Doctor Name, Hospital Address, Work Desc'}
+         {parsedData.length > 0 ? `${parsedData.length} valid rows found` : 'Columns: Employee Email, Category, Target Name, Visit Location, Purpose, Call Date, Time'}
         </span>
         <input
          type="file"
@@ -200,22 +220,25 @@ export default function BulkAssignModal({ onClose, employees, adminId }: BulkAss
          <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider">
           <tr>
            <th className="px-4 py-3">Employee</th>
-           <th className="px-4 py-3">Doctor</th>
+           <th className="px-4 py-3">Target / Category</th>
            <th className="px-4 py-3">Address</th>
            <th className="px-4 py-3">Date/Time</th>
           </tr>
          </thead>
          <tbody className="divide-y divide-slate-100">
           {parsedData.slice(0, 10).map((row, idx) => {
-           const emp = employees.find(e => e.id === row.employeeId);
+           const emp = employees.find(e => e.email.toLowerCase() === row.employeeEmail);
            return (
             <tr key={idx} className="bg-white">
              <td className="px-4 py-3">
-              <span className="font-bold text-slate-800 block">{emp?.name || row.name || 'Unknown'}</span>
-              <span className="text-[10px] text-slate-400 font-mono">{row.employeeId}</span>
+              <span className="font-bold text-slate-800 block">{emp?.name || 'Unknown User'}</span>
+              <span className="text-[10px] text-slate-400 font-mono">{row.employeeEmail}</span>
              </td>
-             <td className="px-4 py-3 font-medium text-slate-700">{row.doctorName}</td>
-             <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate"title={row.hospitalAddress}>{row.hospitalAddress || '-'}</td>
+             <td className="px-4 py-3 font-medium text-slate-700">
+              <span className="text-[10px] text-teal-600 uppercase font-bold tracking-wider block mb-0.5">{row.category}</span>
+              {row.targetName}
+             </td>
+             <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate"title={row.address}>{row.address || '-'}</td>
              <td className="px-4 py-3 text-slate-500">
               {row.date} <span className="font-bold">{row.timeSlot}</span>
              </td>

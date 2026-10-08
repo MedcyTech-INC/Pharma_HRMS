@@ -248,6 +248,38 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     };
   });
 
+  // HARDCODED TEST USER FOR LOCAL TESTING
+  mappedEmployees.push({
+    id: 'OL-TEST-001',
+    employeeCode: 'OL-TEST-001',
+    name: 'Test Admin',
+    email: 'testuser@example.com',
+    designation: 'Corporate Admin',
+    joiningDate: new Date().toISOString().split('T')[0],
+    basicSalary: 0,
+    role: 'admin',
+    password: 'password123',
+    status: 'active',
+    phone: '0000000000',
+    gender: 'male',
+    experience: 0,
+    bankDetails: {},
+    hospital: 'orca_labs',
+    branch: 'corporate',
+    zone: 'Corporate',
+    hierarchyLevel: 'admin',
+    managedBranches: ['corporate', 'ts_zone', 'ap_zone'],
+    isCheckedIn: false,
+    leaveBalance: { sick: { allowed: 6, taken: 0 }, casual: { allowed: 12, taken: 0 }, paternity: { allowed: 7, taken: 0 } },
+    monthlyQuota: { id: 'virtual-test', month: currentMonth, allotted: 3, used: 0, remaining: 3 },
+    leaveRequests: [],
+    attendanceRecords: [],
+    checkInLogs: [],
+    payslips: [],
+    locationPins: [],
+    advanceRequests: []
+  });
+
   return mappedEmployees;
 }
 
@@ -349,6 +381,59 @@ export async function createEmployee(emp: Omit<Employee, 'isCheckedIn' | 'leaveB
     console.warn("Initial leave balance insert notice:", lbErr);
   }
 }
+
+export async function bulkCreateEmployees(employees: Partial<Employee>[]): Promise<void> {
+  const payloads = employees.map(emp => ({
+    id: emp.id,
+    employee_code: emp.employeeCode || emp.id,
+    name: emp.name,
+    email: emp.email,
+    password: emp.password || 'password',
+    role: emp.role || 'employee',
+    designation: emp.designation || 'Business Executive',
+    joining_date: emp.joiningDate || new Date().toISOString().split('T')[0],
+    basic_pay: Number(emp.basicSalary) || 0.00,
+    status: emp.status || 'active',
+    phone: emp.phone || null,
+    gender: emp.gender || 'male',
+    experience: Number(emp.experience) || 0,
+    bank_details: emp.bankDetails || {},
+    branch: emp.branch || 'ap_zone',
+    zone: emp.zone || (emp.branch === 'ts_zone' ? 'TS' : emp.branch === 'corporate' ? 'Corporate' : 'AP'),
+    hospital: 'orca_labs',
+    hierarchy_level: emp.hierarchyLevel || 'be',
+    managed_branches: emp.managedBranches || [emp.branch || 'ap_zone'],
+    reporting_to: emp.reportingTo || null
+  }));
+
+  const { error } = await supabase
+    .from('pharma_hrms_employees')
+    .insert(payloads);
+
+  if (error) {
+    console.error("Bulk create employees failed in Supabase:", error);
+    throw error;
+  }
+
+  // Generate leave balances
+  const initialBalances: any[] = [];
+  employees.forEach(emp => {
+    initialBalances.push({ employee_id: emp.id, leave_type: 'sick', total_allotted: 6, used: 0 });
+    initialBalances.push({ employee_id: emp.id, leave_type: 'casual', total_allotted: 12, used: 0 });
+    if (emp.gender === 'female') {
+      initialBalances.push({ employee_id: emp.id, leave_type: 'maternity', total_allotted: 90, used: 0 });
+    } else if (emp.gender === 'male') {
+      initialBalances.push({ employee_id: emp.id, leave_type: 'paternity', total_allotted: 7, used: 0 });
+    }
+  });
+
+  try {
+    await supabase.from('pharma_hrms_leave_balances').insert(initialBalances);
+  } catch (lbErr) {
+    console.warn("Bulk initial leave balance insert notice:", lbErr);
+  }
+}
+
 
 /**
  * Updates an employee record directly in Supabase PostgreSQL without column stripping.

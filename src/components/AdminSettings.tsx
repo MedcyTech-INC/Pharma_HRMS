@@ -1,13 +1,20 @@
-import React from 'react';
-import { Settings, KeyRound, ShieldCheck, Database, Building2, Server, Smartphone, CheckCircle2 } from 'lucide-react';
-import { Language } from '../types';
+import React, { useState } from 'react';
+import { Settings, KeyRound, ShieldCheck, Database, Building2, Server, Smartphone, CheckCircle2, FileSpreadsheet, Users } from 'lucide-react';
+import { Language, Employee } from '../types';
+import BulkUploadModal from './BulkUploadModal';
+import EmployeeBulkUploadModal from './EmployeeBulkUploadModal';
 
 interface AdminSettingsProps {
   language: Language;
   onOpenProfile?: () => void;
+  employees: Employee[];
+  currentUser: Employee;
 }
 
-export default function AdminSettings({ language, onOpenProfile }: AdminSettingsProps) {
+export default function AdminSettings({ language, onOpenProfile, employees, currentUser }: AdminSettingsProps) {
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [showEmployeeBulkUpload, setShowEmployeeBulkUpload] = useState(false);
+
   return (
     <div className="space-y-6 animate-fadeIn max-w-4xl mx-auto">
       {/* Header */}
@@ -140,6 +147,64 @@ export default function AdminSettings({ language, onOpenProfile }: AdminSettings
           </div>
         </div>
       </div>
+      
+      {/* Bulk Upload Section */}
+      <div className="bg-white rounded-[32px] p-6 sm:p-8 border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-100 mb-6">
+          <FileSpreadsheet className="w-5 h-5 text-teal-600" />
+          <h3 className="text-sm font-bold text-slate-800">
+            Data Management
+          </h3>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-teal-50 border border-teal-100">
+          <div>
+            <h4 className="text-sm font-bold text-slate-800">Bulk Upload Doctor Visits</h4>
+            <p className="text-xs text-slate-600 mt-1">Upload multiple doctor visits via Excel or CSV file.</p>
+          </div>
+          <button 
+            onClick={() => setShowBulkUpload(true)}
+            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-600/15 flex items-center gap-2 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Start Visits Upload
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 mt-4 rounded-2xl bg-blue-50 border border-blue-100">
+          <div>
+            <h4 className="text-sm font-bold text-slate-800">Bulk Upload Employees</h4>
+            <p className="text-xs text-slate-600 mt-1">Upload staff directory data via Excel or CSV file.</p>
+          </div>
+          <button 
+            onClick={() => setShowEmployeeBulkUpload(true)}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/15 flex items-center gap-2 cursor-pointer"
+          >
+            <Users className="w-4 h-4" />
+            Start Employee Upload
+          </button>
+        </div>
+      </div>
+
+      {showBulkUpload && (
+        <BulkUploadModal 
+          onClose={() => setShowBulkUpload(false)}
+          employees={employees}
+          currentUser={currentUser}
+          onSuccess={() => console.log('Bulk upload success')}
+        />
+      )}
+
+      {showEmployeeBulkUpload && (
+        <EmployeeBulkUploadModal 
+          onClose={() => setShowEmployeeBulkUpload(false)}
+          employees={employees}
+          onSuccess={() => {
+            console.log('Employee bulk upload success');
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { AppRouter } from './components/layout/AppRouter';
 import { PwaInstallPrompt } from './components/shared/PwaInstallPrompt';
 import { OfflineIndicator } from './components/shared/OfflineIndicator';
 import { filterEmployeesByScope } from './lib/services/employee-service';
+import NotificationProvider from './components/NotificationProvider';
 
 // One-time Client Handover Reset: Purge any development caches or stale demo sessions
 const HANDOVER_RESET_KEY = 'pharma_client_handover_v1';
@@ -259,6 +260,7 @@ export default function App() {
     <div id="app-root-shell" className="h-screen overflow-hidden bg-[#f8fafc] flex flex-col font-sans antialiased text-slate-900">
         <OfflineIndicator />
         <PwaInstallPrompt />
+        <NotificationProvider currentUser={currentUser} />
         
         {/* 1. Header Navigation Bar */}
         <AppHeader

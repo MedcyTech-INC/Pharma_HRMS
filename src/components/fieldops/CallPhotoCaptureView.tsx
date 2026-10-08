@@ -14,11 +14,13 @@ import {
  Maximize2,
  Sparkles,
  Navigation,
- Plus
+ Plus,
+ Users
 } from 'lucide-react';
 import { FieldVisit, Language, Employee } from '../../types';
 import * as fieldVisitService from '../../lib/services/field-visit-service';
 import { getCurrentLocationSafe } from '../../lib/utils/location-utils';
+import { savePendingUpload } from '../../lib/services/offline-sync-service';
 import { supabase } from '../../lib/supabase-client';
 import AssignVisitModal from '../AssignVisitModal';
 
@@ -55,6 +57,7 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
  const [gpsLoading, setGpsLoading] = useState(false);
  const [notes, setNotes] = useState('');
+ const [taggedColleagues, setTaggedColleagues] = useState<string[]>([]);
  const [submitting, setSubmitting] = useState(false);
  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -326,7 +329,27 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
    setTimeout(() => setSuccessMessage(null), 4000);
    await loadVisits();
   } catch (err: any) {
-   alert('Failed to record start call photo: ' + err.message);
+   const isOffline = !navigator.onLine || err.message?.includes('fetch') || err.message?.includes('network');
+   if (isOffline) {
+     savePendingUpload({
+       type: 'START',
+       visitId: activeVisit.id,
+       employeeId,
+       photoData: capturedPhoto,
+       lat: currentLocation?.lat,
+       lng: currentLocation?.lng,
+       address: currentLocation?.address,
+       notes
+     });
+     setSuccessMessage('You are offline. Arrival photo saved securely to your device and will upload when internet is restored!');
+     setTimeout(() => setSuccessMessage(null), 5000);
+     setCaptureStage('idle');
+     setCapturedPhoto(null);
+     setDurationSeconds(0);
+     setActiveVisit({ ...activeVisit, status: 'IN_PROGRESS', startedAt: new Date().toISOString() } as FieldVisit);
+   } else {
+     alert('Failed to record start call photo: ' + err.message);
+   }
   } finally {
    setSubmitting(false);
   }
@@ -357,15 +380,65 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
     notes
    );
 
+   // Joint Work: Clone visit for tagged colleagues
+   if (taggedColleagues.length > 0) {
+     const clonePromises = taggedColleagues.map(colleagueId => {
+       return supabase.from('pharma_hrms_field_visits').insert([{
+         employee_id: colleagueId,
+         visit_type: activeVisit.visitType,
+         title: activeVisit.title,
+         description: `Joint Visit with ${currentUser?.name || 'Colleague'}`,
+         scheduled_date: new Date().toISOString().split('T')[0],
+         status: 'COMPLETED',
+         start_photo_url: activeVisit.startPhotoUrl || capturedPhoto,
+         proof_photo_url: capturedPhoto,
+         completion_notes: notes,
+         doctor_name: activeVisit.doctorName,
+         clinic_name: activeVisit.clinicName,
+         patient_name: activeVisit.patientName,
+         client_reference: 'JOINT_COPY', // Flag to prevent editing
+         actual_latitude: currentLocation?.lat,
+         actual_longitude: currentLocation?.lng,
+         actual_address: currentLocation?.address,
+         started_at: activeVisit.startedAt,
+         completed_at: new Date().toISOString(),
+         duration_minutes: durationSeconds ? Math.floor(durationSeconds / 60) : 0,
+         approval_status: 'approved'
+       }]);
+     });
+     await Promise.all(clonePromises);
+   }
+
    setSuccessMessage('Visit closed! Departure proof and total duration saved successfully.');
    setTimeout(() => setSuccessMessage(null), 4000);
    setActiveVisit(null);
    setCaptureStage('idle');
    setCapturedPhoto(null);
    setNotes('');
+   setTaggedColleagues([]);
    await loadVisits();
   } catch (err: any) {
-   alert('Failed to complete call: ' + err.message);
+   const isOffline = !navigator.onLine || err.message?.includes('fetch') || err.message?.includes('network');
+   if (isOffline) {
+     savePendingUpload({
+       type: 'COMPLETE',
+       visitId: activeVisit.id,
+       employeeId,
+       photoData: capturedPhoto,
+       lat: currentLocation?.lat,
+       lng: currentLocation?.lng,
+       notes
+     });
+     setSuccessMessage('You are offline. Departure proof saved to your device and will auto-upload when you reconnect!');
+     setTimeout(() => setSuccessMessage(null), 5000);
+     setActiveVisit(null);
+     setCaptureStage('idle');
+     setCapturedPhoto(null);
+     setNotes('');
+     setTaggedColleagues([]);
+   } else {
+     alert('Failed to complete call: ' + err.message);
+   }
   } finally {
    setSubmitting(false);
   }
@@ -600,7 +673,37 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
          />
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+        {/* Joint Work Tagging (Only on Departure) */}
+        {captureStage === 'end_preview' && employees.length > 0 && (
+          <div className="pt-2 border-t border-slate-700/50">
+            <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-teal-400"/>
+                Tag Colleagues (Joint Visit)
+              </span>
+            </label>
+            <p className="text-[10px] text-slate-400 mb-2">Tagged colleagues will automatically receive a completed copy of this visit.</p>
+            <div className="max-h-32 overflow-y-auto space-y-1 bg-slate-800 rounded-xl p-2 border border-slate-700">
+              {employees.filter(e => e.id !== employeeId && e.role === 'employee').map(emp => (
+                <label key={emp.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-slate-600 bg-slate-900 text-teal-500 focus:ring-teal-500/50"
+                    checked={taggedColleagues.includes(emp.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setTaggedColleagues(prev => [...prev, emp.id]);
+                      else setTaggedColleagues(prev => prev.filter(id => id !== emp.id));
+                    }}
+                  />
+                  <span className="text-xs text-slate-200 font-medium">{emp.name}</span>
+                  <span className="text-[10px] text-slate-500">({emp.designation})</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3 pt-2">
          <button
           type="button"
           onClick={() => {

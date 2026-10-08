@@ -2,8 +2,8 @@ export function getPosition(enableHighAccuracy: boolean, timeout: number): Promi
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       timeout,
-      maximumAge: 60000,
-      enableHighAccuracy,
+      maximumAge: 0, // Force fresh satellite data, not cached cell tower data
+      enableHighAccuracy: true, // Always force high accuracy
     });
   });
 }
@@ -34,9 +34,11 @@ export async function getCurrentLocationSafe(): Promise<{ latitude?: number; lon
   try {
     let position: GeolocationPosition | null = null;
     try {
-      position = await getPosition(false, 5000);
-    } catch {
-      position = await getPosition(true, 10000);
+      position = await getPosition(true, 15000); // 15 seconds timeout for high accuracy
+    } catch (err) {
+      // Fallback only if high accuracy fails completely
+      console.warn("High accuracy failed, falling back to standard...", err);
+      position = await getPosition(false, 10000);
     }
 
     const { latitude, longitude } = position.coords;

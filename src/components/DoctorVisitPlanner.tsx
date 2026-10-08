@@ -21,12 +21,17 @@ import {
   ShieldCheck, 
   UserCheck, 
   ArrowRight,
-  Filter
+  Filter,
+  FileSpreadsheet,
+  HelpCircle
 } from 'lucide-react';
+import { Joyride, CallBackProps, STATUS } from 'react-joyride';
 import { Language, Employee, FieldVisit } from '../types';
 import { translations } from '../translations';
 import * as fieldVisitService from '../lib/services/field-visit-service';
 import AssignVisitModal from './AssignVisitModal';
+import BulkUploadModal from './BulkUploadModal';
+import EmployeeBulkUploadModal from './EmployeeBulkUploadModal';
 
 interface DoctorVisitPlannerProps {
   language: Language;
@@ -48,16 +53,57 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
   // Active top-level tab for leaders
   const [plannerTab, setPlannerTab] = useState<'my_schedule' | 'team_approvals'>('my_schedule');
 
+  // Bulk Upload State
+  const [showVisitsUpload, setShowVisitsUpload] = useState(false);
+  const [showEmployeesUpload, setShowEmployeesUpload] = useState(false);
+
+  // App Tour State
+  const [runTour, setRunTour] = useState(false);
+
+  useEffect(() => {
+    // Only run the tour automatically once per user
+    const hasSeenTour = localStorage.getItem(`has_seen_tour_${currentUser.id}`);
+    if (!hasSeenTour) {
+      setRunTour(true);
+      localStorage.setItem(`has_seen_tour_${currentUser.id}`, 'true');
+    }
+  }, [currentUser.id]);
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+    if (finishedStatuses.includes(status)) {
+      setRunTour(false);
+    }
+  };
+
+  const tourSteps = [
+    {
+      target: '.tour-step-1',
+      content: 'Welcome to the Doctor Visit Planner! Here you can schedule and manage your daily clinic visits.',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-step-2',
+      content: 'Select any date on the calendar to see the scheduled visits for that specific day.',
+    },
+    {
+      target: '.tour-step-3',
+      content: 'Click here to plan a new visit. You can search for doctors or clinics from the database.',
+    },
+    {
+      target: '.tour-step-4',
+      content: 'If you manage a team, use this toggle to switch between your personal schedule and pending approvals from your team members.',
+    }
+  ];
+
   // Subordinate Team Members resolution
   const directTeamMembers = useMemo(() => {
-    if (isRSM) {
-      return employees.filter(e => e.reportingTo === currentUser.id || (e.zone === currentUser.zone && (e.hierarchyLevel === 'be' || e.role === 'employee')));
-    }
-    if (isZSM) {
-      return employees.filter(e => e.reportingTo === currentUser.id || e.zone === currentUser.zone);
-    }
     if (isExecutive) {
       return employees.filter(e => e.id !== currentUser.id);
+    }
+    if (isRSM || isZSM) {
+      return employees.filter(e => e.reportingTo === currentUser.id);
     }
     return [];
   }, [employees, currentUser, isRSM, isZSM, isExecutive]);
@@ -187,27 +233,72 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
   }, [teamVisits, approvalFilter, selectedEmployeeFilter]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 pb-16" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="max-w-6xl mx-auto space-y-5 pb-16 relative" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+      <Joyride
+        steps={tourSteps}
+        run={runTour}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#0A84FF',
+            zIndex: 10000,
+          }
+        }}
+      />
 
       {/* ── Apple-Style Page Header ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white px-6 py-5 rounded-[20px] shadow-sm border border-[#E5E5EA]">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-[22px] font-semibold text-[#1C1C1E] tracking-tight">Doctor Visit Planner</h1>
-            {isTeamLead && (
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#E8F4FF] text-[#0A84FF]">
-                Team Lead
-              </span>
-            )}
+      <div className="tour-step-1 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white px-6 py-5 rounded-[20px] shadow-sm border border-[#E5E5EA]">
+        <div className="flex items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[22px] font-semibold text-[#1C1C1E] tracking-tight">Doctor Visit Planner</h1>
+              {isTeamLead && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#E8F4FF] text-[#0A84FF]">
+                  Team Lead
+                </span>
+              )}
+            </div>
+            <p className="text-[13px] text-[#8E8E93] mt-0.5">
+              Plan, track and verify daily clinic &amp; doctor visits across hospital networks
+            </p>
           </div>
-          <p className="text-[13px] text-[#8E8E93] mt-0.5">
-            Plan, track and verify daily clinic &amp; doctor visits across hospital networks
-          </p>
         </div>
 
-        {/* iOS Segmented Control — Tab Switcher */}
-        {hasTeam && (
-          <div className="flex items-center bg-[#EFEFF4] p-1 rounded-[12px] gap-0.5 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <button
+            onClick={() => setRunTour(true)}
+            className="w-8 h-8 rounded-full bg-[#E8F4FF] text-[#0A84FF] flex items-center justify-center hover:bg-[#D1E8FF] transition-colors"
+            title="App Tour & Help"
+          >
+            <HelpCircle size={16} />
+          </button>
+          {/* Bulk Upload Buttons */}
+          <div className="flex items-center gap-2">
+            {currentUser.role === 'admin' && (
+              <button
+                onClick={() => setShowEmployeesUpload(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[12px] text-[12px] font-bold bg-[#F2F2F7] text-[#1C1C1E] hover:bg-[#E5E5EA] transition-colors cursor-pointer"
+              >
+                <Users size={14} />
+                <span className="hidden sm:inline">Bulk Add Staff</span>
+              </button>
+            )}
+            
+            <button
+              onClick={() => setShowVisitsUpload(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[12px] text-[12px] font-bold bg-[#E8F4FF] text-[#0A84FF] hover:bg-[#D1E8FF] transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet size={14} />
+              <span className="hidden sm:inline">Upload Visits</span>
+            </button>
+          </div>
+
+          {/* iOS Segmented Control — Tab Switcher */}
+          {hasTeam && (
+            <div className="tour-step-4 flex items-center bg-[#EFEFF4] p-1 rounded-[12px] gap-0.5 shrink-0">
             <button
               onClick={() => setPlannerTab('my_schedule')}
               className={`flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all cursor-pointer ${
@@ -238,7 +329,8 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
               )}
             </button>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── View Mode 1: Personal Schedule ── */}
@@ -270,7 +362,7 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Left: Week Day Picker */}
-            <div className="lg:col-span-1">
+            <div className="tour-step-2 lg:col-span-1">
               <div className="bg-white rounded-[20px] shadow-sm border border-[#E5E5EA] p-4">
                 <h3 className="text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider mb-3 px-1">Select Day</h3>
                 <div className="space-y-1.5">
@@ -340,7 +432,7 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
                   </div>
                   <button
                     onClick={() => { setModalMode('self'); setIsAssignModalOpen(true); }}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#E8F4FF] hover:bg-[#D0E8FF] text-[#0A84FF] rounded-full text-[12px] font-semibold transition-colors cursor-pointer"
+                    className="tour-step-3 flex items-center gap-1.5 px-3.5 py-1.5 bg-[#E8F4FF] hover:bg-[#D0E8FF] text-[#0A84FF] rounded-full text-[12px] font-semibold transition-colors cursor-pointer"
                   >
                     <Plus size={13} />
                     <span>Add Doctor</span>
@@ -421,23 +513,30 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2 justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-[#E5E5EA]">
-                            {visit.scheduledStart && (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-full text-[11px] font-medium text-[#3C3C43]">
-                                <Clock size={11} className="text-[#8E8E93]" />
-                                <span>{visit.scheduledStart}</span>
-                              </div>
-                            )}
-                            <button
-                              onClick={() => handleDelete(visit.id)}
-                              className="w-7 h-7 flex items-center justify-center text-[#C7C7CC] hover:text-[#FF3B30] hover:bg-red-50 rounded-full transition-all cursor-pointer"
-                              title="Delete Plan"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            <div className="flex items-center gap-2 justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-[#E5E5EA]">
+                              {visit.scheduledStart && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-full text-[11px] font-medium text-[#3C3C43]">
+                                  <Clock size={11} className="text-[#8E8E93]" />
+                                  <span>{visit.scheduledStart}</span>
+                                </div>
+                              )}
+                              
+                              {visit.clientReference === 'JOINT_COPY' ? (
+                                <span className="px-2 py-1 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-100">
+                                  Joint Visit
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleDelete(visit.id)}
+                                  className="w-7 h-7 flex items-center justify-center text-[#C7C7CC] hover:text-[#FF3B30] hover:bg-red-50 rounded-full transition-all cursor-pointer"
+                                  title="Delete Plan"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
                     })}
                   </div>
                 )}
@@ -595,13 +694,19 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
                             }`}>
                               {visit.approvalStatus === 'approved' ? '✓ Approved' : '✗ Rejected'}
                             </span>
-                            <button
-                              onClick={() => handleDelete(visit.id)}
-                              className="w-7 h-7 flex items-center justify-center text-[#C7C7CC] hover:text-[#FF3B30] hover:bg-red-50 rounded-full transition-all cursor-pointer"
-                              title="Delete Record"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {visit.clientReference === 'JOINT_COPY' ? (
+                              <span className="px-2 py-1 bg-purple-50 text-purple-700 text-[10px] font-bold rounded-md border border-purple-100">
+                                Joint Visit
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleDelete(visit.id)}
+                                className="w-7 h-7 flex items-center justify-center text-[#C7C7CC] hover:text-[#FF3B30] hover:bg-red-50 rounded-full transition-all cursor-pointer"
+                                title="Delete Record"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -626,6 +731,30 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
           isSelfSchedule={modalMode === 'self'}
           targetEmployeeId={modalMode === 'self' ? currentUser.id : undefined}
           onVisitCreated={async () => { await loadVisits(); }}
+        />
+      )}
+
+      {/* Bulk Upload Modals */}
+      {showVisitsUpload && (
+        <BulkUploadModal 
+          onClose={() => setShowVisitsUpload(false)}
+          employees={employees}
+          currentUser={currentUser}
+          onSuccess={() => {
+            setShowVisitsUpload(false);
+            loadVisits();
+          }}
+        />
+      )}
+
+      {showEmployeesUpload && (
+        <EmployeeBulkUploadModal 
+          onClose={() => setShowEmployeesUpload(false)}
+          employees={employees}
+          onSuccess={() => {
+            setShowEmployeesUpload(false);
+            window.location.reload();
+          }}
         />
       )}
     </div>

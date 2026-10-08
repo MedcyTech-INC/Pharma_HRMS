@@ -240,7 +240,7 @@ export const AppRouter: React.FC<AppRouterProps> = ({
    );
   case 'adminSettings':
    return (
-    <AdminSettings language={language} onOpenProfile={onOpenProfile} />
+    <AdminSettings language={language} onOpenProfile={onOpenProfile} employees={employees} currentUser={currentUser} />
    );
   case 'tasks':
    return (
