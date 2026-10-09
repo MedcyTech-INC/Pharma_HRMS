@@ -22,7 +22,13 @@ export function useAuth(employees: Employee[]) {
     localStorage.removeItem('hrms_user_session');
   };
 
-  const currentUser = currentUserId ? employees.find(e => e.id === currentUserId) : null;
+  const currentUser = currentUserId
+    ? employees.find(e =>
+        (e.id && e.id.toLowerCase() === currentUserId.toLowerCase()) ||
+        (e.employeeCode && e.employeeCode.toLowerCase() === currentUserId.toLowerCase()) ||
+        (e.email && e.email.toLowerCase() === currentUserId.toLowerCase())
+      ) || null
+    : null;
 
   return {
     currentUser,

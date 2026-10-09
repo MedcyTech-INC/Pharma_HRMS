@@ -25,7 +25,8 @@ import {
   FileSpreadsheet,
   HelpCircle
 } from 'lucide-react';
-import { Joyride, CallBackProps, STATUS } from 'react-joyride';
+import { Joyride, STATUS } from 'react-joyride';
+const ComponentJoyride = Joyride as any;
 import { Language, Employee, FieldVisit } from '../types';
 import { translations } from '../translations';
 import * as fieldVisitService from '../lib/services/field-visit-service';
@@ -59,21 +60,18 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
 
   // App Tour State
   const [runTour, setRunTour] = useState(false);
+  const [hasCompletedTour, setHasCompletedTour] = useState<boolean>(() => {
+    return localStorage.getItem(`has_completed_tour_${currentUser.id}`) === 'true';
+  });
 
-  useEffect(() => {
-    // Only run the tour automatically once per user
-    const hasSeenTour = localStorage.getItem(`has_seen_tour_${currentUser.id}`);
-    if (!hasSeenTour) {
-      setRunTour(true);
-      localStorage.setItem(`has_seen_tour_${currentUser.id}`, 'true');
-    }
-  }, [currentUser.id]);
-
-  const handleJoyrideCallback = (data: CallBackProps) => {
+  const handleJoyrideCallback = (data: any) => {
     const { status } = data;
-    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED, 'close'];
     if (finishedStatuses.includes(status)) {
       setRunTour(false);
+      localStorage.setItem(`has_completed_tour_${currentUser.id}`, 'true');
+      setHasCompletedTour(true);
+      window.dispatchEvent(new Event('tour_completed'));
     }
   };
 
@@ -234,19 +232,17 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
 
   return (
     <div className="max-w-6xl mx-auto space-y-5 pb-16 relative" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      <Joyride
+      <ComponentJoyride
         steps={tourSteps}
         run={runTour}
         continuous={true}
-        showProgress={true}
-        showSkipButton={true}
         callback={handleJoyrideCallback}
         styles={{
           options: {
             primaryColor: '#0A84FF',
             zIndex: 10000,
           }
-        }}
+        } as any}
       />
 
       {/* ── Apple-Style Page Header ── */}
@@ -259,6 +255,31 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-[#E8F4FF] text-[#0A84FF]">
                   Team Lead
                 </span>
+              )}
+              {!hasCompletedTour && (
+                <div className="flex items-center gap-1 bg-slate-900 text-white text-[11px] font-bold py-1 pl-3 pr-1.5 rounded-full shadow-sm animate-pulse border border-slate-700">
+                  <button
+                    onClick={() => setRunTour(true)}
+                    className="flex items-center gap-2 cursor-pointer hover:text-teal-300 transition-colors"
+                    title="Click to start interactive tutorial"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping shrink-0" />
+                    <span>Take Tour</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRunTour(false);
+                      localStorage.setItem(`has_completed_tour_${currentUser.id}`, 'true');
+                      setHasCompletedTour(true);
+                      window.dispatchEvent(new Event('tour_completed'));
+                    }}
+                    className="ml-1 p-0.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-full transition-colors cursor-pointer"
+                    title="Dismiss tour permanently"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               )}
             </div>
             <p className="text-[13px] text-[#8E8E93] mt-0.5">

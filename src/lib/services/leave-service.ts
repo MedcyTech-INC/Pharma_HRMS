@@ -1,5 +1,6 @@
 import { supabase } from '../supabase-client';
 import { LeaveRequest, LeaveType } from '../../types';
+import { sendNotification, notifyReportingManagers } from './notification-service';
 
 export async function submitLeaveRequest(empId: string, leave: Omit<LeaveRequest, 'id'>): Promise<void> {
   const { error } = await supabase
@@ -14,6 +15,14 @@ export async function submitLeaveRequest(empId: string, leave: Omit<LeaveRequest
     }]);
 
   if (error) throw error;
+
+  // Notify RSM / Managers about new leave request
+  await notifyReportingManagers(
+    empId, 
+    'New Leave Request Submitted', 
+    `Leave request submitted for ${leave.type} (${leave.fromDate} to ${leave.toDate}).`, 
+    'leave'
+  );
 }
 
 export async function updateLeaveRequestStatus(requestId: string, approverId: string, status: 'Approved' | 'Rejected', adminNote?: string): Promise<void> {
@@ -31,6 +40,17 @@ export async function updateLeaveRequestStatus(requestId: string, approverId: st
     .eq('id', requestId);
 
   if (error) throw error;
+
+  // Notify Employee about Leave decision
+  if (request?.employee_id) {
+    await sendNotification({
+      recipient_id: request.employee_id,
+      sender_id: approverId,
+      title: `Leave Request ${status}`,
+      message: `Your leave request from ${request.from_date} to ${request.to_date} has been ${status.toLowerCase()}.${adminNote ? ` Note: ${adminNote}` : ''}`,
+      type: 'leave'
+    });
+  }
 
   if (status === 'Approved' && request) {
     const from = new Date(request.from_date);
