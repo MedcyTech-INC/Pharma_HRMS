@@ -1,7 +1,7 @@
 -- Migration: 09_hrms_holidays_schema.sql
 -- Description: Create HRMS_holidays table and seed 2026 Holiday Calendar for Pharma HRMS
 
-CREATE TABLE IF NOT EXISTS HRMS_holidays (
+CREATE TABLE IF NOT EXISTS pharma_hrms_holidays (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   date DATE NOT NULL,
   day TEXT NOT NULL,
@@ -13,19 +13,19 @@ CREATE TABLE IF NOT EXISTS HRMS_holidays (
 );
 
 -- Row Level Security (RLS)
-ALTER TABLE HRMS_holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pharma_hrms_holidays ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE tablename = 'hrms_holidays' AND policyname = 'allow_read_all'
   ) THEN
-    CREATE POLICY allow_read_all ON HRMS_holidays FOR SELECT USING (true);
+    CREATE POLICY allow_read_all ON pharma_hrms_holidays FOR SELECT USING (true);
   END IF;
 END $$;
 
 -- Seed 2026 holidays for Pharma HRMS
-INSERT INTO HRMS_holidays (date, day, name, type, year) VALUES
+INSERT INTO pharma_hrms_holidays (date, day, name, type, year) VALUES
   ('2026-01-14', 'Wednesday', 'Bhogi', 'gazetted', 2026),
   ('2026-01-15', 'Thursday', 'Sankranthi', 'gazetted', 2026),
   ('2026-01-16', 'Friday', 'Kanuma', 'gazetted', 2026),
