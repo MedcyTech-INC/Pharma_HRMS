@@ -32,6 +32,23 @@ from app.routers import auth
 
 app.include_router(auth.router)
 
+@app.get("/api")
+async def api_root():
+    return {
+        "status": "online",
+        "app": settings.APP_NAME,
+        "version": "1.0.0",
+        "docs_url": "/api/docs",
+        "endpoints": {
+            "health": "/api/health",
+            "auth": "/api/auth/login",
+            "docs": "/api/docs"
+        }
+    }
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "app": settings.APP_NAME}
+
+# Export sio_app as alias to app for gunicorn/socketio compatibility in Docker
+sio_app = app

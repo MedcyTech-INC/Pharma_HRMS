@@ -21,14 +21,23 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:9590", "https://hrms.orcalabs.in", "http://localhost:5173", "http://localhost:3000"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:9590",
+        "http://127.0.0.1:9590",
+        "https://pharmafm.medcytech.com",
+        "https://hrms.orcalabs.in",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
     
     # App
     APP_NAME: str = "Orca Labs Pharma HRMS"
     DEBUG: bool = False
 
     class Config:
-        env_file = "../.env"
+        env_file = ".env"
         case_sensitive = True
         extra = "ignore"
 
