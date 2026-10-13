@@ -3,7 +3,9 @@ import fs from 'fs';
 import path from 'path';
 
 async function generateIcons() {
-  const publicDir = path.resolve('public');
+  const publicDir = fs.existsSync(path.resolve('public')) 
+    ? path.resolve('public') 
+    : path.resolve(__dirname, '../public');
   const emblemSource = path.join(publicDir, 'orca-emblem.png');
   const logoSource = path.join(publicDir, 'orca-logo.png');
 

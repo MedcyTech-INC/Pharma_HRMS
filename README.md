@@ -1,68 +1,54 @@
-# Orca Labs — Pharma HRMS & Field Force Portal
+# 🐬 Orca Labs — Pharma HRMS Frontend PWA
 
-Production-ready Progressive Web Application (PWA) for Orca Labs Pharmaceutical Field Force, Attendance, Doctor Visits, Team Hub, and Work Assignments.
+Enterprise Progressive Web Application (PWA) for Pharmaceutical Sales Force Management, Daily Call Reporting (DCR), and Geofenced Attendance.
+
+Built with **React 19**, **TypeScript**, **Tailwind CSS v4**, **Vite 6**, and **Nginx**.
 
 ---
 
-## 🚀 Quick Start on Ubuntu Linux VPS (Docker)
+## 🚀 Quick Start with Docker
 
-### 1. Clone & Enter Directory
-```bash
-git clone <YOUR_GIT_REPO_URL>
-cd pharma_HRMS
-```
-
-### 2. Optional Environment Setup
-A `.env.example` file is included with pre-configured defaults. If you want to customize ports or keys:
+### 1. Configure Ports & Environment
+Copy the `.env` template:
 ```bash
 cp .env.example .env
 ```
+Default ports configured to avoid conflicts:
+* **Frontend Web App**: `http://localhost:9590` (Port `9590`)
+* **Supabase Cloud Database**: Pointed to active PostgreSQL KVM instance
 
-### 3. Build & Run with Docker Compose
+### 2. Build & Run
 ```bash
 docker compose up -d --build
 ```
 
-### 4. Verify Container Status
+### 3. Check Status
 ```bash
 docker compose ps
-docker compose logs -f
-```
-
-The application will be live at:
-```text
-http://<YOUR_VPS_IP>:9590
+docker compose logs -f frontend
 ```
 
 ---
 
-## 📱 Production HTTPS & Domain (Recommended for PWA)
+## 🛠️ Local Development (Without Docker)
 
-To allow employees to install the PWA on mobile phones, serve the app over HTTPS.
-
-If using a domain with Nginx Reverse Proxy & Certbot on your VPS:
-```nginx
-server {
-    server_name hrms.orcalabs.in;
-
-    location / {
-        proxy_pass http://127.0.0.1:9590;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-Then issue SSL via Let's Encrypt:
 ```bash
-sudo certbot --nginx -d hrms.orcalabs.in
+# 1. Install dependencies
+npm install
+
+# 2. Start local dev server
+npm run dev
+
+# 3. Production build
+npm run build
 ```
 
 ---
 
-## 🗄️ Database Setup & Reset
-All database schemas and initial migration scripts are in `database/`:
-- **Pristine Client Handover Reset**: `database/08_client_handover_reset.sql`
-- **Team Hub Approvals Migration**: `database/07_team_hub_migration.sql`
-- **Official 35 Personnel Seed**: `database/02_seed_pharma_hrms_employees.sql`
+## 📂 Architecture Overview
+
+* **`src/components/`**: Modular domain components (Attendance, Field Ops, Doctor Visits, Tasks, Org Hierarchy, Leaves, Chat).
+* **`src/hooks/`**: Custom data hooks (`useAuth`, `useEmployees`, `useAttendance`, `useLeaves`, `useTaskModule`, etc.).
+* **`src/lib/services/`**: Direct Supabase PostgreSQL query services and offline sync engines.
+* **`nginx.conf`**: Production Nginx SPA reverse proxy with PWA caching controls and dynamic API forwarding.
+* **`Dockerfile`**: Multi-stage Debian Bookworm build with glibc native binary support and lightweight Alpine Nginx runner.

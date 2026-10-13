@@ -1,62 +1,27 @@
-services:
-  # Frontend (Static PWA)
+﻿services:
   frontend:
     build:
-      context: ./frontend
+      context: .
       dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://srv1674496.hstgr.cloud}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc4ODY5MDUxLCJleHAiOjIwOTQyMjkwNTF9.NiS-C4ehy7uR_O1KVimHDL-HiDacCQ7WbohsiGNP5ak}
+        VITE_COMPANY_NAME: ${VITE_COMPANY_NAME:-Orca Labs}
+        VITE_APP_TITLE: ${VITE_APP_TITLE:-Orca Labs Pharma HRMS}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-AIzaSyDn6JKKmDVEn8GLUBE7kcl_dtIcyU85ZYc}
+        VITE_MAP_DEFAULT_LAT: ${VITE_MAP_DEFAULT_LAT:-17.3850}
+        VITE_MAP_DEFAULT_LNG: ${VITE_MAP_DEFAULT_LNG:-78.4867}
+        VITE_MAP_DEFAULT_ZOOM: ${VITE_MAP_DEFAULT_ZOOM:-12}
+        VITE_OSRM_ENDPOINT: ${VITE_OSRM_ENDPOINT:-https://router.project-osrm.org}
+        VITE_LIVE_BROADCAST_INTERVAL_MS: ${VITE_LIVE_BROADCAST_INTERVAL_MS:-10000}
+    container_name: pharma_hrms_frontend
+    restart: unless-stopped
     ports:
-      - "3000:80"
-
-  # Backend API (FastAPI)
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      gunicorn app.main:sio_app
-      --bind 0.0.0.0:8000
-      --workers 4
-      --worker-class uvicorn.workers.UvicornWorker
-      --timeout 120
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://hrms:${DB_PASSWORD:-password}@postgres:5432/pharma_hrms
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-secret}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-refresh_secret}
-      SUPABASE_URL: ${VITE_SUPABASE_URL:-}
-      SUPABASE_KEY: ${VITE_SUPABASE_ANON_KEY:-}
-    depends_on:
-      - postgres
-      - redis
-
-  postgres:
-    image: postgis/postgis:16-3.4-alpine
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./database:/docker-entrypoint-initdb.d
-    environment:
-      POSTGRES_DB: pharma_hrms
-      POSTGRES_USER: hrms
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-    ports:
-      - "5432:5432"
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "9590:80"
-      - "443:443"
-    # Note: Nginx config needs to be updated to route /api to backend and / to frontend
-    depends_on:
-      - frontend
-      - backend
-
-volumes:
-  pgdata:
+      # Maps host port (default 9590, configurable via .env) to internal Nginx port 80
+      - "${FRONTEND_PORT:-9590}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
