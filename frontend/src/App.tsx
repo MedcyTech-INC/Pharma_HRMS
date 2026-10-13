@@ -210,8 +210,8 @@ export default function App() {
             <span className="text-[9px] font-bold uppercase tracking-wider text-teal-600">Quick Setup:</span>
             <ol className="text-[10px] text-slate-500 space-y-1 list-decimal list-inside leading-normal font-medium">
               <li>Open your Supabase SQL Editor</li>
-              <li>Run the schema script from <code className="font-mono bg-slate-200/60 px-1 rounded text-slate-700">database/06_all_tables_complete.sql</code></li>
-              <li>Verify environment variables in <code className="font-mono bg-slate-200/60 px-1 rounded text-slate-700">.env</code></li>
+              <li>Run the schema script from <code className="font-mono bg-slate-200/60 px-1 rounded text-slate-700">backend/database/00_pharma_hrms_full_migration.sql</code></li>
+              <li>Verify environment variables in <code className="font-mono bg-slate-200/60 px-1 rounded text-slate-700">frontend/.env</code></li>
             </ol>
           </div>
 

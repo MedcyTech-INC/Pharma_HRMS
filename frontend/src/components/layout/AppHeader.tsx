@@ -1,7 +1,8 @@
-import React from 'react';
-import { Menu, Bell, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, Bell, Search, Activity } from 'lucide-react';
 import { Employee } from '../../types';
 import { OrcaLogo } from '../OrcaLogo';
+import { checkBackendHealth } from '../../lib/api-client';
 
 interface AppHeaderProps {
   currentUser: Employee;
@@ -17,6 +18,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onLogoClick,
   onOpenMenu
 }) => {
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    checkBackendHealth()
+      .then(() => { if (isMounted) setApiOnline(true); })
+      .catch(() => { if (isMounted) setApiOnline(false); });
+    return () => { isMounted = false; };
+  }, []);
+
   const getAvatarInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').slice(0, 2);
   };
@@ -53,7 +64,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          {apiOnline !== null && (
+            <div 
+              title={apiOnline ? "FastAPI Backend is connected via /api" : "Operating in Direct/Standalone mode"}
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border ${
+                apiOnline 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                  : 'bg-slate-100 border-slate-200 text-slate-500'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${apiOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+              <span>{apiOnline ? 'API Connected' : 'Direct Mode'}</span>
+            </div>
+          )}
+
           <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors relative cursor-pointer">
             <Bell size={18} />
             <div className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-slate-100"></div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Employee } from '../types';
+import { clearStoredTokens } from '../lib/api-client';
 
 export function useAuth(employees: Employee[]) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export function useAuth(employees: Employee[]) {
   const logout = () => {
     setCurrentUserId(null);
     localStorage.removeItem('hrms_user_session');
+    clearStoredTokens();
   };
 
   const currentUser = currentUserId ? employees.find(e => e.id === currentUserId) : null;
