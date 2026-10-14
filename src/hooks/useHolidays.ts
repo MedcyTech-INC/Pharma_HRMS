@@ -5,12 +5,11 @@ import {
   getTodayHoliday,
   getNextHoliday,
   getUpcomingHolidays,
-  isHolidayEve,
-  DEFAULT_HOLIDAYS_2026
+  isHolidayEve
 } from '../lib/services/holiday-service';
 
 export function useHolidays(year: number = 2026) {
-  const [holidays, setHolidays] = useState<Holiday[]>(DEFAULT_HOLIDAYS_2026);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 

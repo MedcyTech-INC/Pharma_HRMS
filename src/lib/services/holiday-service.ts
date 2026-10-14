@@ -1,49 +1,19 @@
 import { supabase } from '../supabase-client';
 import { Holiday } from '../../types';
 
-export const DEFAULT_HOLIDAYS_2026: Holiday[] = [
-  { id: 'h-1', date: '2026-01-14', day: 'Wednesday', name: 'Bhogi', type: 'gazetted', year: 2026 },
-  { id: 'h-2', date: '2026-01-15', day: 'Thursday', name: 'Sankranthi', type: 'gazetted', year: 2026 },
-  { id: 'h-3', date: '2026-01-16', day: 'Friday', name: 'Kanuma', type: 'gazetted', year: 2026 },
-  { id: 'h-4', date: '2026-01-17', day: 'Saturday', name: 'Mukanuma', type: 'gazetted', year: 2026 },
-  { id: 'h-5', date: '2026-01-26', day: 'Monday', name: 'Republic Day', type: 'gazetted', year: 2026 },
-  { id: 'h-6', date: '2026-02-16', day: 'Wednesday', name: 'Shivarathri Next Day', type: 'gazetted', year: 2026 },
-  { id: 'h-7', date: '2026-03-19', day: 'Thursday', name: 'Ugadi', type: 'gazetted', year: 2026 },
-  { id: 'h-8', date: '2026-03-27', day: 'Friday', name: 'Sri Rama Navami', type: 'gazetted', year: 2026 },
-  { id: 'h-9', date: '2026-05-01', day: 'Thursday', name: 'May Day', type: 'gazetted', year: 2026 },
-  { id: 'h-10', date: '2026-08-15', day: 'Saturday', name: 'Independence Day', type: 'gazetted', year: 2026 },
-  { id: 'h-11', date: '2026-09-14', day: 'Monday', name: 'Ganesh Puja', type: 'gazetted', year: 2026 },
-  { id: 'h-12', date: '2026-10-02', day: 'Friday', name: 'Gandhi Jayanthi', type: 'gazetted', year: 2026 },
-  { id: 'h-13', date: '2026-10-20', day: 'Tuesday', name: 'Dasara', type: 'gazetted', year: 2026 },
-  { id: 'h-14', date: '2026-11-12', day: 'Thursday', name: 'Nagula Chavathi', type: 'gazetted', year: 2026 },
-  { id: 'h-15', date: '2026-12-25', day: 'Friday', name: 'Christmas', type: 'gazetted', year: 2026 },
-  { id: 'h-16', date: '2026-11-08', day: 'Sunday', name: 'Deepavali', type: 'sunday_compensatory', year: 2026 }
-];
+
 
 export async function fetchHolidays(year: number = 2026): Promise<Holiday[]> {
   try {
     let { data, error } = await supabase
-      .from('HRMS_holidays')
+      .from('pharma_hrms_holidays')
       .select('*')
       .eq('year', year)
       .order('date', { ascending: true });
 
-    if (error) {
-      // Try alternate table name if prefixed
-      const resAlt = await supabase
-        .from('pharma_hrms_holidays')
-        .select('*')
-        .eq('year', year)
-        .order('date', { ascending: true });
-
-      if (!resAlt.error && resAlt.data && resAlt.data.length > 0) {
-        data = resAlt.data;
-        error = null;
-      }
-    }
-
     if (error || !data || data.length === 0) {
-      return DEFAULT_HOLIDAYS_2026.filter(h => h.year === year);
+      console.warn('No holidays found in database for year', year);
+      return [];
     }
 
     return data.map((item: any) => ({
@@ -55,8 +25,8 @@ export async function fetchHolidays(year: number = 2026): Promise<Holiday[]> {
       year: item.year || year
     }));
   } catch (err) {
-    console.warn('Error loading holidays for Pharma HRMS, using local dataset:', err);
-    return DEFAULT_HOLIDAYS_2026.filter(h => h.year === year);
+    console.error('Error fetching holidays:', err);
+    return [];
   }
 }
 
