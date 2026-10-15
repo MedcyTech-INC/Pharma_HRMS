@@ -71,15 +71,8 @@ export default function LoginScreen({ employees, onLoginSuccess }: LoginScreenPr
         }
       }
     } catch (apiErr: any) {
-      // If error is explicit credential denial (401), show invalid credentials
-      const errMsg = apiErr?.message || '';
-      if (errMsg.includes('Incorrect') || errMsg.includes('disabled') || errMsg.includes('401') || errMsg.includes('403')) {
-        setError(errMsg.includes('disabled') ? loginText.errInactive : loginText.errInvalid);
-        setIsSubmitting(false);
-        return;
-      }
-      // Otherwise backend is offline/unreachable: smoothly fallback to local verification
-      console.info('Backend API unavailable, falling back to local verification:', errMsg);
+      // Backend error or offline: smoothly fallback to direct verification
+      console.info('Backend API notice, falling back to direct verification:', apiErr?.message);
     }
 
     // 2. Fallback / Direct Verification

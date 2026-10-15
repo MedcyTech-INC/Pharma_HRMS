@@ -65,7 +65,7 @@ export default function EmployeeDirectory({
  const [formRole, setFormRole] = useState<'admin' | 'employee'>('employee');
  const [formPhone, setFormPhone] = useState('');
  const [formPassword, setFormPassword] = useState('');
- const [formStatus, setFormStatus] = useState<'active' | 'inactive'>('active');
+ const [formStatus, setFormStatus] = useState<'active' | 'inactive' | 'pending'>('active');
  const [formBranch, setFormBranch] = useState<Branch>('ap_zone');
  const [formHierarchyLevel, setFormHierarchyLevel] = useState<HierarchyLevel>('be');
  const [formReportingTo, setFormReportingTo] = useState<string>('');
@@ -134,10 +134,25 @@ export default function EmployeeDirectory({
   }
   
   try {
+   const existingIds = new Set(employees.map(emp => (emp.id || '').toUpperCase()));
+   const numericSuffixes = employees
+    .map(emp => {
+     const match = (emp.id || '').match(/OL(\d+)/i);
+     return match ? parseInt(match[1], 10) : null;
+    })
+    .filter((n): n is number => n !== null);
+
+   let nextNum = numericSuffixes.length > 0 ? Math.max(...numericSuffixes) + 1 : employees.length + 1;
+   let newId = `OL${String(nextNum).padStart(3, '0')}`;
+   while (existingIds.has(newId.toUpperCase())) {
+    nextNum++;
+    newId = `OL${String(nextNum).padStart(3, '0')}`;
+   }
+
    await onAddEmployee({
-    id: `OL${String(employees.length + 1).padStart(3, '0')}`,
+    id: newId,
     name: formName,
-    email: formEmail,
+    email: formEmail.trim().toLowerCase(),
     designation: formDesignation,
     joiningDate: formJoiningDate,
     basicSalary: Number(formBasicSalary),
@@ -146,7 +161,7 @@ export default function EmployeeDirectory({
     hierarchyLevel: formHierarchyLevel,
     reportingTo: formReportingTo || undefined,
     phone: formPhone,
-    password: formPassword,
+    password: formPassword.trim(),
     status: formStatus,
     gender: formGender,
     experience: formExperience,
@@ -169,7 +184,7 @@ export default function EmployeeDirectory({
   if (!formName || !formEmail || !formDesignation || !editTargetId) return;
   onUpdateEmployee(editTargetId, {
    name: formName,
-   email: formEmail,
+   email: formEmail.trim().toLowerCase(),
    designation: formDesignation,
    joiningDate: formJoiningDate,
    basicSalary: Number(formBasicSalary),
@@ -178,7 +193,7 @@ export default function EmployeeDirectory({
    hierarchyLevel: formHierarchyLevel,
    reportingTo: formReportingTo || undefined,
    phone: formPhone,
-   password: formPassword,
+   password: formPassword.trim(),
    status: formStatus,
    gender: formGender,
    experience: formExperience,
@@ -914,11 +929,12 @@ export default function EmployeeDirectory({
          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status</label>
          <select
           value={formStatus}
-          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive')}
+          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive' | 'pending')}
           className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-700"
          >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+          <option value="pending">Pending</option>
          </select>
         </div>
        </div>
@@ -1177,11 +1193,12 @@ export default function EmployeeDirectory({
          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status</label>
          <select
           value={formStatus}
-          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive')}
+          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive' | 'pending')}
           className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-700"
          >
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+          <option value="pending">Pending</option>
          </select>
         </div>
        </div>
