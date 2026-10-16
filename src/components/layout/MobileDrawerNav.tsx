@@ -52,6 +52,22 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
   roleSubtitle = `${currentUser.designation || 'Staff'} · ${currentUser.branch === 'visakhapatnam' ? 'Vizag' : 'Vizianagaram'}`;
  }
 
+ const [hasCompletedTour, setHasCompletedTour] = React.useState<boolean>(() => {
+  return localStorage.getItem(`has_completed_tour_${currentUser.id}`) === 'true';
+ });
+
+ useEffect(() => {
+  const checkStatus = () => {
+   setHasCompletedTour(localStorage.getItem(`has_completed_tour_${currentUser.id}`) === 'true');
+  };
+  window.addEventListener('tour_completed', checkStatus);
+  window.addEventListener('storage', checkStatus);
+  return () => {
+   window.removeEventListener('tour_completed', checkStatus);
+   window.removeEventListener('storage', checkStatus);
+  };
+ }, [currentUser.id]);
+
  // Prevent background body scroll when drawer is open
  useEffect(() => {
   if (isOpen) {
@@ -144,9 +160,9 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
     </div>
 
     {/* Navigation Links Scrollable List */}
-    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
      <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-      {isAdmin ? 'Administration Modules' : 'Employee Dashboards'}
+      My Workspace
      </p>
 
      {isAdmin ? (
@@ -244,14 +260,19 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
 
        <button
         onClick={() => handleTabClick('doctorPlanner')}
-        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
          activeTab === 'doctorPlanner'
           ? 'bg-teal-50 text-teal-700 font-bold border border-teal-200'
           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
         }`}
        >
-        <Calendar className={`w-4 h-4 shrink-0 ${activeTab === 'doctorPlanner' ? 'text-teal-600' : 'text-slate-400'}`} />
-        <span>Doctor Plans</span>
+        <div className="flex items-center gap-3">
+         <Calendar className={`w-4 h-4 shrink-0 ${activeTab === 'doctorPlanner' ? 'text-teal-600' : 'text-slate-400'}`} />
+         <span>Doctor Plans</span>
+        </div>
+        {!hasCompletedTour && (
+         <span className="w-2.5 h-2.5 rounded-full bg-slate-900 ring-2 ring-white animate-ping" title="Tour available" />
+        )}
        </button>
 
        {isTeamLead && (

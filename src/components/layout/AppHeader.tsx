@@ -66,13 +66,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {/* Right Controls */}
         <div className="flex items-center gap-3 sm:gap-4">
           {apiOnline !== null && (
-            <div 
+            <div
               title={apiOnline ? "FastAPI Backend is connected via /api" : "Operating in Direct/Standalone mode"}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border ${
-                apiOnline 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border ${apiOnline
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                   : 'bg-slate-100 border-slate-200 text-slate-500'
-              }`}
+                }`}
             >
               <span className={`w-2 h-2 rounded-full ${apiOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
               <span>{apiOnline ? 'API Connected' : 'Direct Mode'}</span>

@@ -39,32 +39,75 @@ export default function NotificationProvider({ currentUser }: NotificationProvid
   useEffect(() => {
     if (!currentUser) return;
 
+    const myId = (currentUser.id || '').toLowerCase();
+    const myCode = (currentUser.employeeCode || '').toLowerCase();
+    const myEmail = (currentUser.email || '').toLowerCase();
+    const isLeadership = ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes((currentUser.role || '').toLowerCase()) ||
+                        ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes((currentUser.hierarchyLevel || '').toLowerCase());
+
+    const isRecipient = (recipId?: string) => {
+      if (!recipId) return false;
+      const target = recipId.toLowerCase();
+      if (target === myId || target === myCode || target === myEmail || target === 'all') return true;
+      if (isLeadership && (target === 'all_leadership' || target === 'admin')) return true;
+      return false;
+    };
+
+    const handleNewNotif = (e: any) => {
+      const notification = e.detail;
+      if (notification && isRecipient(notification.recipient_id)) {
+        playDing();
+        const id = Date.now() + Math.random();
+        setToasts(prev => [...prev, { id, ...notification }]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 5000);
+      }
+    };
+
+    window.addEventListener('new_notification', handleNewNotif);
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'pharma_hrms_local_notifications' && e.newValue) {
+        try {
+          const list = JSON.parse(e.newValue);
+          const latest = list[0];
+          if (latest && isRecipient(latest.recipient_id)) {
+            playDing();
+            const id = Date.now() + Math.random();
+            setToasts(prev => [...prev, { id, ...latest }]);
+            setTimeout(() => {
+              setToasts(prev => prev.filter(t => t.id !== id));
+            }, 5000);
+          }
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
     // Subscribe to notifications for the current user
     const channel = supabase
       .channel('public:pharma_hrms_notifications')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'pharma_hrms_notifications',
-        filter: `recipient_id=eq.${currentUser.id}`
+        table: 'pharma_hrms_notifications'
       }, (payload) => {
         const notification = payload.new;
-        
-        // Play sound
-        playDing();
-
-        // Add toast
-        const id = Date.now();
-        setToasts(prev => [...prev, { id, ...notification }]);
-
-        // Remove toast after 5 seconds
-        setTimeout(() => {
-          setToasts(prev => prev.filter(t => t.id !== id));
-        }, 5000);
+        if (notification && isRecipient(notification.recipient_id)) {
+          playDing();
+          const id = Date.now() + Math.random();
+          setToasts(prev => [...prev, { id, ...notification }]);
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+          }, 5000);
+        }
       })
       .subscribe();
 
     return () => {
+      window.removeEventListener('new_notification', handleNewNotif);
+      window.removeEventListener('storage', handleStorage);
       supabase.removeChannel(channel);
     };
   }, [currentUser]);

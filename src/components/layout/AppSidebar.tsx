@@ -40,6 +40,22 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const isManagerOrZSM = isZSM || isRSM;
   const isAdmin = isExecutive || isManagerOrZSM;
 
+  const [hasCompletedTour, setHasCompletedTour] = React.useState<boolean>(() => {
+    return localStorage.getItem(`has_completed_tour_${currentUser.id}`) === 'true';
+  });
+
+  React.useEffect(() => {
+    const checkStatus = () => {
+      setHasCompletedTour(localStorage.getItem(`has_completed_tour_${currentUser.id}`) === 'true');
+    };
+    window.addEventListener('tour_completed', checkStatus);
+    window.addEventListener('storage', checkStatus);
+    return () => {
+      window.removeEventListener('tour_completed', checkStatus);
+      window.removeEventListener('storage', checkStatus);
+    };
+  }, [currentUser.id]);
+
   // Common button class generator matching VizagIVF_HRMS exactly
   const getBtnClass = (tabId: string) => {
     const isActive = activeTab === tabId;
@@ -58,7 +74,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     <aside id="desktop-sidebar" className="hidden lg:flex flex-col bg-white border-r border-slate-100 h-full no-print w-[80px] hover:w-64 transition-all duration-300 overflow-hidden group z-50 shrink-0">
       
       {/* Top Toggle Area */}
-      <div className="h-16 flex items-center px-6 shrink-0">
+      <div className="h-16 flex items-center px-6 shrink-0 border-b border-slate-50">
         <div className="w-6 flex justify-center">
           <Menu className="w-6 h-6 text-slate-800 shrink-0 cursor-pointer" />
         </div>
@@ -67,197 +83,194 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         </span>
       </div>
 
-      {/* Nav Items */}
-      <div className="flex-1 py-2 flex flex-col gap-0.5 overflow-hidden">
-        {isAdmin ? (
-          <>
-            {/* Punch In / Duty for non-exempt leadership (ZSM & RSM) */}
-            {isManagerOrZSM && (
-              <button onClick={() => onSelectTab('dashboard')} className={getBtnClass('dashboard')}>
-                <div className={getIconClass('dashboard')}>
-                  <Clock size={22} />
-                </div>
-                <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
-                  {currentUser.isCheckedIn ? 'My Duty (Active)' : 'Punch In / Duty'}
-                </span>
-              </button>
-            )}
+      {/* Nav Items Container with scrolling enabled */}
+      <div className="flex-1 py-3 flex flex-col gap-4 overflow-y-auto custom-scrollbar overflow-x-hidden">
+        
+        {/* ================= PART 1: DESIGNATED USER MODULES ================= */}
+        <div className="flex flex-col gap-0.5">
+          <div className="px-6 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              My Workspace
+            </span>
+          </div>
 
-            {isExecutive && (
-              <button onClick={() => onSelectTab('executiveOverview')} className={getBtnClass('executiveOverview')}>
-                <div className={getIconClass('executiveOverview')}>
-                  <Activity size={22} />
-                </div>
-                <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Executive Overview</span>
-              </button>
-            )}
-
-            <button onClick={() => onSelectTab('adminDashboard')} className={getBtnClass('adminDashboard')}>
-              <div className={getIconClass('adminDashboard')}>
-                <Home size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Dashboard</span>
-            </button>
-
-            <button onClick={() => onSelectTab('orgChart')} className={getBtnClass('orgChart')}>
-              <div className={getIconClass('orgChart')}>
-                <GitBranch size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Team Hierarchy</span>
-            </button>
-
-            <button onClick={() => onSelectTab('teamHub')} className={getBtnClass('teamHub')}>
-              <div className={getIconClass('teamHub')}>
-                <UserCheck size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Team Hub</span>
-            </button>
-
-            <button onClick={() => onSelectTab('directory')} className={getBtnClass('directory')}>
-              <div className={getIconClass('directory')}>
-                <Users size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Directory</span>
-            </button>
-
-            <button onClick={() => onSelectTab('attendanceOverview')} className={getBtnClass('attendanceOverview')}>
-              <div className={getIconClass('attendanceOverview')}>
-                <Calendar size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Attendance</span>
-            </button>
-
-            <button onClick={() => onSelectTab('leaveApprovals')} className={getBtnClass('leaveApprovals')}>
-              <div className={getIconClass('leaveApprovals')}>
-                <Moon size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Leaves</span>
-            </button>
-
-            <button onClick={() => onSelectTab('doctorPlanner')} className={getBtnClass('doctorPlanner')}>
-              <div className={getIconClass('doctorPlanner')}>
-                <Calendar size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Doctor Plans</span>
-            </button>
-
-            {(isRSM || isZSM) && (
-              <>
-                <button onClick={() => onSelectTab('callCapture')} className={getBtnClass('callCapture')}>
-                  <div className={getIconClass('callCapture')}>
-                    <Camera size={22} />
-                  </div>
-                  <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Visit Log</span>
-                </button>
-                <button onClick={() => onSelectTab('fieldDuty')} className={getBtnClass('fieldDuty')}>
-                  <div className={getIconClass('fieldDuty')}>
-                    <MapPin size={22} />
-                  </div>
-                  <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Navigation</span>
-                </button>
-              </>
-            )}
-
-            {isExecutive && (
-              <button onClick={() => onSelectTab('officeLocations')} className={getBtnClass('officeLocations')}>
-                <div className={getIconClass('officeLocations')}>
-                  <MapPin size={22} />
-                </div>
-                <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Locations</span>
-              </button>
-            )}
-
-            <button onClick={() => onSelectTab('messages')} className={getBtnClass('messages')}>
-              <div className={getIconClass('messages')}>
-                <MessageSquare size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Messages</span>
-            </button>
-
-            {isExecutive && (
-              <button onClick={() => onSelectTab('fieldOps')} className={getBtnClass('fieldOps')}>
-                <div className={getIconClass('fieldOps')}>
-                  <MapPin size={22} />
-                </div>
-                <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Field Register</span>
-              </button>
-            )}
-
-            <button onClick={() => onSelectTab('adminTasks')} className={getBtnClass('adminTasks')}>
-              <div className={getIconClass('adminTasks')}>
-                <CheckSquare size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Assignments</span>
-            </button>
-
-            {isExecutive && (
-              <button onClick={() => onSelectTab('adminSettings')} className={getBtnClass('adminSettings')}>
-                <div className={getIconClass('adminSettings')}>
-                  <Settings size={22} />
-                </div>
-                <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Settings</span>
-              </button>
-            )}
-          </>
-        ) : (
-          <>
+          {/* Punch In / Duty for non-exempt leadership (ZSM & RSM) */}
+          {isManagerOrZSM && (
             <button onClick={() => onSelectTab('dashboard')} className={getBtnClass('dashboard')}>
               <div className={getIconClass('dashboard')}>
-                <Home size={22} />
+                <Clock size={22} />
               </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Home</span>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                {currentUser.isCheckedIn ? 'My Duty (Active)' : 'Punch In / Duty'}
+              </span>
             </button>
+          )}
 
-            <button onClick={() => onSelectTab('fieldDuty')} className={getBtnClass('fieldDuty')}>
-              <div className={getIconClass('fieldDuty')}>
+          {/* Core Dashboard */}
+          <button onClick={() => onSelectTab(isAdmin ? 'adminDashboard' : 'dashboard')} className={getBtnClass(isAdmin ? 'adminDashboard' : 'dashboard')}>
+            <div className={getIconClass(isAdmin ? 'adminDashboard' : 'dashboard')}>
+              <Home size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Dashboard
+            </span>
+          </button>
+
+          {/* Doctor Plans with Persistent Tour Indicator */}
+          <button onClick={() => onSelectTab('doctorPlanner')} className={getBtnClass('doctorPlanner')}>
+            <div className={`relative ${getIconClass('doctorPlanner')}`}>
+              <Calendar size={22} />
+              {!hasCompletedTour && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-slate-900 ring-2 ring-white animate-ping" title="Interactive Tour Available" />
+              )}
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px] flex items-center justify-between w-full pr-2">
+              <span>Doctor Plans</span>
+              {!hasCompletedTour && (
+                <span className="w-2 h-2 rounded-full bg-slate-900 animate-pulse shrink-0 ml-1" />
+              )}
+            </span>
+          </button>
+
+          {/* Visit Log */}
+          <button onClick={() => onSelectTab('callCapture')} className={getBtnClass('callCapture')}>
+            <div className={getIconClass('callCapture')}>
+              <Camera size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Visit Log
+            </span>
+          </button>
+
+          {/* Attendance */}
+          <button onClick={() => onSelectTab(isAdmin ? 'attendanceOverview' : 'attendance')} className={getBtnClass(isAdmin ? 'attendanceOverview' : 'attendance')}>
+            <div className={getIconClass(isAdmin ? 'attendanceOverview' : 'attendance')}>
+              <Calendar size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Attendance
+            </span>
+          </button>
+
+          {/* Leaves */}
+          <button onClick={() => onSelectTab(isAdmin ? 'leaveApprovals' : 'leave')} className={getBtnClass(isAdmin ? 'leaveApprovals' : 'leave')}>
+            <div className={getIconClass(isAdmin ? 'leaveApprovals' : 'leave')}>
+              <Moon size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Leaves
+            </span>
+          </button>
+
+          {/* Navigation / Field Duty */}
+          <button onClick={() => onSelectTab('fieldDuty')} className={getBtnClass('fieldDuty')}>
+            <div className={getIconClass('fieldDuty')}>
+              <MapPin size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Navigation
+            </span>
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="my-1 border-t border-slate-100 mx-4" />
+
+        {/* ================= PART 2: TEAM RELATED MODULES ================= */}
+        <div className="flex flex-col gap-0.5">
+          <div className="px-6 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Team Management
+            </span>
+          </div>
+
+          {/* Team Hierarchy */}
+          <button onClick={() => onSelectTab('orgChart')} className={getBtnClass('orgChart')}>
+            <div className={getIconClass('orgChart')}>
+              <GitBranch size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Team Hierarchy
+            </span>
+          </button>
+
+          {/* Team Hub */}
+          <button onClick={() => onSelectTab('teamHub')} className={getBtnClass('teamHub')}>
+            <div className={getIconClass('teamHub')}>
+              <UserCheck size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Team Hub
+            </span>
+          </button>
+
+          {/* Assignments */}
+          <button onClick={() => onSelectTab(isAdmin ? 'adminTasks' : 'tasks')} className={getBtnClass(isAdmin ? 'adminTasks' : 'tasks')}>
+            <div className={getIconClass(isAdmin ? 'adminTasks' : 'tasks')}>
+              <CheckSquare size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Assignments
+            </span>
+          </button>
+
+          {/* Messages */}
+          <button onClick={() => onSelectTab('messages')} className={getBtnClass('messages')}>
+            <div className={getIconClass('messages')}>
+              <MessageSquare size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Messages
+            </span>
+          </button>
+
+          {/* Directory */}
+          <button onClick={() => onSelectTab('directory')} className={getBtnClass('directory')}>
+            <div className={getIconClass('directory')}>
+              <Users size={22} />
+            </div>
+            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+              Directory
+            </span>
+          </button>
+
+          {/* Executive Overview (Role specific) */}
+          {isExecutive && (
+            <button onClick={() => onSelectTab('executiveOverview')} className={getBtnClass('executiveOverview')}>
+              <div className={getIconClass('executiveOverview')}>
+                <Activity size={22} />
+              </div>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                Executive Overview
+              </span>
+            </button>
+          )}
+
+          {/* Field Register (Role specific) */}
+          {isExecutive && (
+            <button onClick={() => onSelectTab('fieldOps')} className={getBtnClass('fieldOps')}>
+              <div className={getIconClass('fieldOps')}>
                 <MapPin size={22} />
               </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Navigation</span>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                Field Register
+              </span>
             </button>
+          )}
 
-            <button onClick={() => onSelectTab('callCapture')} className={getBtnClass('callCapture')}>
-              <div className={getIconClass('callCapture')}>
-                <Camera size={22} />
+          {/* Settings (Role specific) */}
+          {isExecutive && (
+            <button onClick={() => onSelectTab('adminSettings')} className={getBtnClass('adminSettings')}>
+              <div className={getIconClass('adminSettings')}>
+                <Settings size={22} />
               </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Visit Log</span>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                Settings
+              </span>
             </button>
+          )}
+        </div>
 
-            <button onClick={() => onSelectTab('doctorPlanner')} className={getBtnClass('doctorPlanner')}>
-              <div className={getIconClass('doctorPlanner')}>
-                <Calendar size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Visit Planner</span>
-            </button>
-
-            <button onClick={() => onSelectTab('attendance')} className={getBtnClass('attendance')}>
-              <div className={getIconClass('attendance')}>
-                <Calendar size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">My Attendance</span>
-            </button>
-
-            <button onClick={() => onSelectTab('leave')} className={getBtnClass('leave')}>
-              <div className={getIconClass('leave')}>
-                <Moon size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Leave Requests</span>
-            </button>
-
-            <button onClick={() => onSelectTab('tasks')} className={getBtnClass('tasks')}>
-              <div className={getIconClass('tasks')}>
-                <CheckSquare size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Work Assignment</span>
-            </button>
-
-            <button onClick={() => onSelectTab('messages')} className={getBtnClass('messages')}>
-              <div className={getIconClass('messages')}>
-                <MessageSquare size={22} />
-              </div>
-              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">Messages</span>
-            </button>
-          </>
-        )}
       </div>
 
       {/* Footer / Power */}

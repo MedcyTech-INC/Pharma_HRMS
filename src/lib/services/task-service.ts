@@ -1,5 +1,6 @@
 import { supabase } from '../supabase-client';
 import { Task, TaskPriority, TaskStatus } from '../../types';
+import { sendNotification } from './notification-service';
 
 const LOCAL_STORAGE_KEY = 'pharma_tasks_local';
 
@@ -146,6 +147,22 @@ export async function createTask(
     }
 
     const created = mapDbRowToTask(data);
+
+    // Send task assignment notification
+    if (insertPayload.assigned_to) {
+      try {
+        await sendNotification({
+          recipient_id: insertPayload.assigned_to,
+          sender_id: insertPayload.created_by || undefined,
+          title: 'New Work Assignment',
+          message: `You have been assigned a task: "${title}".`,
+          type: 'assignment'
+        });
+      } catch (nErr) {
+        console.warn('Could not send task notification:', nErr);
+      }
+    }
+
     return created;
   } catch (err) {
     console.warn("Error creating task, saving locally:", err);
@@ -164,6 +181,17 @@ export async function createTask(
       approvedBy: taskData.approvedBy,
       createdAt: new Date().toISOString()
     };
+
+    if (taskData.assignedTo) {
+      sendNotification({
+        recipient_id: taskData.assignedTo,
+        sender_id: taskData.createdBy,
+        title: 'New Work Assignment',
+        message: `You have been assigned a task: "${title}".`,
+        type: 'assignment'
+      }).catch(e => console.warn(e));
+    }
+
     const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
     const list: Task[] = cached ? JSON.parse(cached) : [];
     list.unshift(fallbackTask);
@@ -250,6 +278,21 @@ export async function approveTask(
     approvalNote: note || 'Approved by manager'
   };
   await updateTask(taskId, updates);
+
+  try {
+    const { data: task } = await supabase.from('pharma_hrms_tasks').select('assigned_to, title').eq('id', taskId).maybeSingle();
+    if (task?.assigned_to) {
+      await sendNotification({
+        recipient_id: task.assigned_to,
+        sender_id: approverId,
+        title: 'Task Approved',
+        message: `Your task "${task.title || 'Task'}" has been approved.`,
+        type: 'assignment'
+      });
+    }
+  } catch (err) {
+    console.warn('Task approval notification error:', err);
+  }
 }
 
 export async function rejectTask(
@@ -263,6 +306,21 @@ export async function rejectTask(
     approvalNote: note || 'Rejected by manager'
   };
   await updateTask(taskId, updates);
+
+  try {
+    const { data: task } = await supabase.from('pharma_hrms_tasks').select('assigned_to, title').eq('id', taskId).maybeSingle();
+    if (task?.assigned_to) {
+      await sendNotification({
+        recipient_id: task.assigned_to,
+        sender_id: approverId,
+        title: 'Task Revision Requested / Rejected',
+        message: `Your task "${task.title || 'Task'}" was rejected. Note: ${note}`,
+        type: 'assignment'
+      });
+    }
+  } catch (err) {
+    console.warn('Task rejection notification error:', err);
+  }
 }
 
 export async function reassignTask(
@@ -275,6 +333,17 @@ export async function reassignTask(
     assignedEmployeeName: newAssigneeName
   };
   await updateTask(taskId, updates);
+
+  try {
+    await sendNotification({
+      recipient_id: newAssigneeId,
+      title: 'Task Reassigned to You',
+      message: `A work assignment has been reassigned to you.`,
+      type: 'assignment'
+    });
+  } catch (nErr) {
+    console.warn('Could not send task reassignment notification:', nErr);
+  }
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

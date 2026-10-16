@@ -369,8 +369,8 @@ export async function createEmployee(emp: Omit<Employee, 'isCheckedIn' | 'leaveB
     id: emp.id,
     employee_code: emp.employeeCode || emp.id,
     name: emp.name,
-    email: emp.email,
-    password: emp.password || (Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4)),
+    email: (emp.email || '').trim().toLowerCase(),
+    password: (emp.password || (emp.email ? emp.email.trim().toLowerCase() : 'password')).trim(),
     role: emp.role || 'employee',
     designation: emp.designation || 'Business Executive',
     joining_date: emp.joiningDate || new Date().toISOString().split('T')[0],
@@ -384,7 +384,6 @@ export async function createEmployee(emp: Omit<Employee, 'isCheckedIn' | 'leaveB
     zone: emp.zone || (emp.branch === 'ts_zone' ? 'TS' : emp.branch === 'corporate' ? 'Corporate' : 'AP'),
     hospital: 'orca_labs',
     hierarchy_level: emp.hierarchyLevel || 'be',
-    managed_branches: emp.managedBranches || [emp.branch || 'ap_zone'],
     reporting_to: emp.reportingTo || null
   };
 
@@ -419,8 +418,8 @@ export async function bulkCreateEmployees(employees: Partial<Employee>[]): Promi
     id: emp.id,
     employee_code: emp.employeeCode || emp.id,
     name: emp.name,
-    email: emp.email,
-    password: emp.password || 'password',
+    email: (emp.email || '').trim().toLowerCase(),
+    password: (emp.password || 'password').trim(),
     role: emp.role || 'employee',
     designation: emp.designation || 'Business Executive',
     joining_date: emp.joiningDate || new Date().toISOString().split('T')[0],
@@ -434,7 +433,6 @@ export async function bulkCreateEmployees(employees: Partial<Employee>[]): Promi
     zone: emp.zone || (emp.branch === 'ts_zone' ? 'TS' : emp.branch === 'corporate' ? 'Corporate' : 'AP'),
     hospital: 'orca_labs',
     hierarchy_level: emp.hierarchyLevel || 'be',
-    managed_branches: emp.managedBranches || [emp.branch || 'ap_zone'],
     reporting_to: emp.reportingTo || null
   }));
 
@@ -473,13 +471,13 @@ export async function bulkCreateEmployees(employees: Partial<Employee>[]): Promi
 export async function updateEmployee(id: string, fields: Partial<Employee>): Promise<void> {
   const updatePayload: any = {};
   if (fields.name !== undefined) updatePayload.name = fields.name;
-  if (fields.email !== undefined) updatePayload.email = fields.email;
+  if (fields.email !== undefined) updatePayload.email = fields.email.trim().toLowerCase();
   if (fields.employeeCode !== undefined) updatePayload.employee_code = fields.employeeCode;
   if (fields.designation !== undefined) updatePayload.designation = fields.designation;
   if (fields.joiningDate !== undefined) updatePayload.joining_date = fields.joiningDate;
   if (fields.basicSalary !== undefined) updatePayload.basic_pay = fields.basicSalary;
   if (fields.role !== undefined) updatePayload.role = fields.role;
-  if (fields.password !== undefined) updatePayload.password = fields.password;
+  if (fields.password !== undefined) updatePayload.password = fields.password.trim();
   if (fields.status !== undefined) updatePayload.status = fields.status;
   if (fields.phone !== undefined) updatePayload.phone = fields.phone;
   if (fields.gender !== undefined) updatePayload.gender = fields.gender;
@@ -488,7 +486,6 @@ export async function updateEmployee(id: string, fields: Partial<Employee>): Pro
   if (fields.branch !== undefined) updatePayload.branch = fields.branch;
   if (fields.zone !== undefined) updatePayload.zone = fields.zone;
   if (fields.hierarchyLevel !== undefined) updatePayload.hierarchy_level = fields.hierarchyLevel;
-  if (fields.managedBranches !== undefined) updatePayload.managed_branches = fields.managedBranches;
   if (fields.reportingTo !== undefined) updatePayload.reporting_to = fields.reportingTo;
 
   if (Object.keys(updatePayload).length > 0) {

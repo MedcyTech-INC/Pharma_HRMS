@@ -3,6 +3,7 @@ import { FieldVisit, FieldVisitStatus, FieldEventType, FieldVisitType } from '..
 import { logFieldEvent } from './field-event-service';
 import { addProof } from './field-proof-service';
 import { getDistanceMeters } from '../geofence';
+import { sendNotification, notifyReportingManagers } from './notification-service';
 
 function mapVisit(data: any): FieldVisit {
   return {
@@ -161,6 +162,32 @@ export async function bulkCreateVisits(visits: Partial<FieldVisit>[]): Promise<v
   } catch (tErr) {
     console.warn('Could not mirror bulk visits to HRMS_tasks:', tErr);
   }
+
+  // Dispatch real-time notifications for assigned visits across hierarchy
+  try {
+    for (const v of visits) {
+      if (v.assignedBy && v.assignedBy !== v.employeeId && v.employeeId) {
+        // Leadership assigned a call to BE
+        await sendNotification({
+          recipient_id: v.employeeId,
+          sender_id: v.assignedBy,
+          title: 'New Field Call Assigned',
+          message: `You have been assigned a doctor visit for ${v.doctorName || v.title || 'Field Call'} on ${v.scheduledDate}.`,
+          type: 'visit'
+        });
+      } else if (v.employeeId) {
+        // BE planned a call requiring approval/review
+        await notifyReportingManagers(
+          v.employeeId,
+          'Call Schedule Approval Required',
+          `A team member scheduled a call for ${v.doctorName || v.title} requiring approval.`,
+          'visit'
+        );
+      }
+    }
+  } catch (nErr) {
+    console.warn('Could not send visit notifications:', nErr);
+  }
 }
 
 export async function updateVisitStatus(
@@ -237,24 +264,21 @@ export async function updateVisitStatus(
         updatePayload.duration_minutes = Math.round((compTime - arrTime) / 60000);
       }
       
-      // NEW: Create Notification for RSM
+      // Send Notification for RSM / Managers
       try {
         const { data: empData } = await supabase
           .from('pharma_hrms_employees')
-          .select('name, reporting_to')
-          .eq('id', employeeId)
-          .single();
+          .select('name')
+          .or(`id.eq.${employeeId},employee_code.eq.${employeeId}`)
+          .maybeSingle();
           
-        if (empData && empData.reporting_to) {
-          await supabase.from('pharma_hrms_notifications').insert([{
-            recipient_id: empData.reporting_to,
-            sender_id: employeeId,
-            title: 'Visit Completed',
-            message: `${empData.name} submitted the report for ${existing.doctor_name || 'a doctor'}`,
-            type: 'visit_submitted',
-            reference_id: visitId
-          }]);
-        }
+        const empName = empData?.name || 'A team member';
+        await notifyReportingManagers(
+          employeeId,
+          'Doctor Visit Report Submitted',
+          `${empName} submitted the call report for ${existing.doctor_name || existing.title || 'a doctor'}.`,
+          'visit'
+        );
       } catch (err) {
         console.warn('Failed to send notification:', err);
       }

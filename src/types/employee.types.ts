@@ -6,9 +6,9 @@ import type { AdvanceRequest } from './advance.types';
 import type { LocationPin } from './location.types';
 
 export interface BankDetails {
-  accountNumber: string;
-  bankName: string;
-  ifsc: string;
+  accountNumber?: string;
+  bankName?: string;
+  ifsc?: string;
   accountType?: 'savings' | 'current';
 }
 

@@ -52,7 +52,15 @@ export function useAuth(employees: Employee[]) {
     clearStoredTokens();
   };
 
-  const currentUser = (currentUserId ? employees.find(e => e.id === currentUserId) : null) || profileUser;
+  const matchedEmp = currentUserId
+    ? employees.find(e =>
+        (e.id && e.id.toLowerCase() === currentUserId.toLowerCase()) ||
+        (e.employeeCode && e.employeeCode.toLowerCase() === currentUserId.toLowerCase()) ||
+        (e.email && e.email.toLowerCase() === currentUserId.toLowerCase())
+      ) || null
+    : null;
+
+  const currentUser = matchedEmp || profileUser;
 
   return {
     currentUser,
