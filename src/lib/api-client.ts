@@ -132,7 +132,13 @@ export async function apiRefreshToken(): Promise<string | null> {
  * Verify backend connectivity and health status.
  */
 export async function checkBackendHealth(): Promise<HealthResponse> {
-  return apiFetch<HealthResponse>('/health');
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
+  try {
+    return await apiFetch<HealthResponse>('/health', { signal: controller?.signal });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -162,5 +168,11 @@ export async function apiLogin(email: string, password: string): Promise<LoginRe
  * Fetch authenticated current user profile from /api/auth/me.
  */
 export async function apiGetMe(): Promise<any> {
-  return apiFetch<any>('/auth/me');
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
+  try {
+    return await apiFetch<any>('/auth/me', { signal: controller?.signal });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }

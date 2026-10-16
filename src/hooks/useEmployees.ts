@@ -5,10 +5,8 @@ import * as employeeService from '../lib/services/employee-service';
 export function useEmployees() {
   const [employees, setEmployees] = useState<Employee[]>(() => {
     try {
-      // Actively purge any legacy or local dump cache
-      localStorage.removeItem('hrms_local_employees');
-      localStorage.removeItem('pharma_hrms_local_employees');
-      return [];
+      const cached = typeof window !== 'undefined' ? sessionStorage.getItem('pharma_hrms_cached_employees') : null;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -29,6 +27,11 @@ export function useEmployees() {
 
       const emps = await employeeService.fetchAllEmployeesData();
       setEmployees(emps);
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pharma_hrms_cached_employees', JSON.stringify(emps));
+        }
+      } catch {}
     } catch (err: any) {
       console.error('Error fetching Supabase employee data:', err);
       const errDetails = err?.message || err?.details || 'Database connection offline.';

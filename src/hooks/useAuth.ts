@@ -7,7 +7,14 @@ export function useAuth(employees: Employee[]) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     return localStorage.getItem('hrms_user_session') || null;
   });
-  const [profileUser, setProfileUser] = useState<Employee | null>(null);
+  const [profileUser, setProfileUser] = useState<Employee | null>(() => {
+    try {
+      const cached = localStorage.getItem('hrms_cached_profile');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Validate session against backend on mount
   useEffect(() => {
@@ -26,7 +33,9 @@ export function useAuth(employees: Employee[]) {
           if (me && me.id) {
             setCurrentUserId(me.id);
             localStorage.setItem('hrms_user_session', me.id);
-            setProfileUser(mapRawEmployeeToFrontend(me));
+            const mapped = mapRawEmployeeToFrontend(me);
+            setProfileUser(mapped);
+            localStorage.setItem('hrms_cached_profile', JSON.stringify(mapped));
           }
         })
         .catch(() => {
@@ -42,6 +51,7 @@ export function useAuth(employees: Employee[]) {
     localStorage.setItem('hrms_user_session', id);
     if (profile) {
       setProfileUser(profile);
+      localStorage.setItem('hrms_cached_profile', JSON.stringify(profile));
     }
   };
 
@@ -49,6 +59,7 @@ export function useAuth(employees: Employee[]) {
     setCurrentUserId(null);
     setProfileUser(null);
     localStorage.removeItem('hrms_user_session');
+    localStorage.removeItem('hrms_cached_profile');
     clearStoredTokens();
   };
 
