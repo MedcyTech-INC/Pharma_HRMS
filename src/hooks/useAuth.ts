@@ -1,30 +1,58 @@
 import { useState, useEffect } from 'react';
 import { Employee } from '../types';
-import { clearStoredTokens } from '../lib/api-client';
+import { clearStoredTokens, getStoredToken, apiGetMe } from '../lib/api-client';
+import { mapRawEmployeeToFrontend } from '../lib/services/employee-service';
 
 export function useAuth(employees: Employee[]) {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    return localStorage.getItem('hrms_user_session') || null;
+  });
+  const [profileUser, setProfileUser] = useState<Employee | null>(null);
 
-  // Load from local storage on mount
+  // Validate session against backend on mount
   useEffect(() => {
-    const saved = localStorage.getItem('hrms_user_session');
-    if (saved) {
-      setCurrentUserId(saved);
+    const token = getStoredToken();
+    const savedUserId = localStorage.getItem('hrms_user_session');
+
+    if (!token && !savedUserId) {
+      setCurrentUserId(null);
+      setProfileUser(null);
+      return;
+    }
+
+    if (token) {
+      apiGetMe()
+        .then((me) => {
+          if (me && me.id) {
+            setCurrentUserId(me.id);
+            localStorage.setItem('hrms_user_session', me.id);
+            setProfileUser(mapRawEmployeeToFrontend(me));
+          }
+        })
+        .catch(() => {
+          if (!savedUserId) {
+            logout();
+          }
+        });
     }
   }, []);
 
-  const login = (id: string) => {
+  const login = (id: string, profile?: Employee) => {
     setCurrentUserId(id);
     localStorage.setItem('hrms_user_session', id);
+    if (profile) {
+      setProfileUser(profile);
+    }
   };
 
   const logout = () => {
     setCurrentUserId(null);
+    setProfileUser(null);
     localStorage.removeItem('hrms_user_session');
     clearStoredTokens();
   };
 
-  const currentUser = currentUserId ? employees.find(e => e.id === currentUserId) : null;
+  const currentUser = (currentUserId ? employees.find(e => e.id === currentUserId) : null) || profileUser;
 
   return {
     currentUser,

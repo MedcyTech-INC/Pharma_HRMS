@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { KeyRound, Mail, Eye, EyeOff, ShieldCheck, Sparkles, Activity } from 'lucide-react';
 import { Employee } from '../types';
 import { OrcaLogo } from './OrcaLogo';
-import { apiLogin, checkBackendHealth } from '../lib/api-client';
+import { apiLogin, apiGetMe, checkBackendHealth } from '../lib/api-client';
+import { mapRawEmployeeToFrontend } from '../lib/services/employee-service';
 
 interface LoginScreenProps {
   language?: string;
@@ -37,6 +38,7 @@ export default function LoginScreen({ employees, onLoginSuccess }: LoginScreenPr
     btnIn: "Access HRMS Workspace",
     errInvalid: "Invalid email or password. Initial password is your official email address.",
     errInactive: "Your account is inactive. Please contact Orca Labs HR & Admin.",
+    errServer: "Authentication server is unreachable. Please verify backend connection."
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,57 +53,58 @@ export default function LoginScreen({ employees, onLoginSuccess }: LoginScreenPr
     setIsSubmitting(true);
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Attempt API login via FastAPI Backend (/api/auth/login)
+    // Sole Authentication Authority: FastAPI Backend (/api/auth/login)
     try {
       const apiResult = await apiLogin(cleanEmail, password);
       if (apiResult && apiResult.user_id) {
-        // Matched via backend API
-        const matched = employees.find(
-          (emp) => emp.id === apiResult.user_id || emp.email.toLowerCase() === cleanEmail
-        );
-        if (matched) {
-          if (matched.status === 'inactive') {
-            setError(loginText.errInactive);
-            setIsSubmitting(false);
-            return;
+        // Fetch authoritative profile via /api/auth/me
+        let userProfile: Employee | null = null;
+        try {
+          const rawMe = await apiGetMe();
+          if (rawMe) {
+            userProfile = mapRawEmployeeToFrontend(rawMe);
           }
-          onLoginSuccess(matched);
+        } catch (meErr) {
+          console.warn('Could not fetch /api/auth/me profile, matching from loaded data:', meErr);
+        }
+
+        if (!userProfile && employees && employees.length > 0) {
+          userProfile = employees.find(
+            (emp) => emp.id === apiResult.user_id || emp.email.toLowerCase() === cleanEmail
+          ) || null;
+        }
+
+        if (!userProfile) {
+          userProfile = mapRawEmployeeToFrontend({
+            id: apiResult.user_id,
+            email: cleanEmail,
+            role: apiResult.role,
+            name: cleanEmail.split('@')[0],
+            status: 'active'
+          });
+        }
+
+        if (userProfile.status === 'inactive') {
+          setError(loginText.errInactive);
           setIsSubmitting(false);
           return;
         }
-      }
-    } catch (apiErr: any) {
-      // If error is explicit credential denial (401), show invalid credentials
-      const errMsg = apiErr?.message || '';
-      if (errMsg.includes('Incorrect') || errMsg.includes('disabled') || errMsg.includes('401') || errMsg.includes('403')) {
-        setError(errMsg.includes('disabled') ? loginText.errInactive : loginText.errInvalid);
+
+        onLoginSuccess(userProfile);
         setIsSubmitting(false);
         return;
       }
-      // Otherwise backend is offline/unreachable: smoothly fallback to local verification
-      console.info('Backend API unavailable, falling back to local verification:', errMsg);
-    }
-
-    // 2. Fallback / Direct Verification
-    const matched = employees.find(
-      (emp) => emp.email.toLowerCase() === cleanEmail && (
-        emp.password === password ||
-        emp.email.toLowerCase() === password.toLowerCase() ||
-        password === 'password' ||
-        password === 'OrcaLabs@2026'
-      )
-    );
-
-    setIsSubmitting(false);
-
-    if (matched) {
-      if (matched.status === 'inactive') {
+    } catch (apiErr: any) {
+      const errMsg = apiErr?.message || '';
+      if (errMsg.includes('Incorrect') || errMsg.includes('401')) {
+        setError(loginText.errInvalid);
+      } else if (errMsg.includes('disabled') || errMsg.includes('inactive') || errMsg.includes('403')) {
         setError(loginText.errInactive);
       } else {
-        onLoginSuccess(matched);
+        setError(loginText.errServer);
       }
-    } else {
-      setError(loginText.errInvalid);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

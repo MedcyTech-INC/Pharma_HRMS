@@ -93,12 +93,12 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8088',
           changeOrigin: true,
           secure: false,
         },
         '/socket.io': {
-          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8088',
           ws: true,
           changeOrigin: true,
         },
@@ -109,7 +109,7 @@ export default defineConfig(() => {
       host: true,
       proxy: {
         '/api': {
-          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
+          target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8088',
           changeOrigin: true,
           secure: false,
         },

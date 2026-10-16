@@ -248,39 +248,71 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     };
   });
 
-  // HARDCODED TEST USER FOR LOCAL TESTING
-  mappedEmployees.push({
-    id: 'OL-TEST-001',
-    employeeCode: 'OL-TEST-001',
-    name: 'Test Admin',
-    email: 'testuser@example.com',
-    designation: 'Corporate Admin',
-    joiningDate: new Date().toISOString().split('T')[0],
-    basicSalary: 0,
-    role: 'admin',
-    password: 'password123',
-    status: 'active',
-    phone: '0000000000',
-    gender: 'male',
-    experience: 0,
-    bankDetails: {},
-    hospital: 'orca_labs',
-    branch: 'corporate',
-    zone: 'Corporate',
-    hierarchyLevel: 'admin',
-    managedBranches: ['corporate', 'ts_zone', 'ap_zone'],
-    isCheckedIn: false,
-    leaveBalance: { sick: { allowed: 6, taken: 0 }, casual: { allowed: 12, taken: 0 }, paternity: { allowed: 7, taken: 0 } },
-    monthlyQuota: { id: 'virtual-test', month: currentMonth, allotted: 3, used: 0, remaining: 3 },
+  return mappedEmployees;
+}
+
+/**
+ * Maps a raw employee record (from backend API or DB) to a complete frontend Employee object.
+ */
+export function mapRawEmployeeToFrontend(emp: any): Employee {
+  const currentMonth = new Date().toISOString().substring(0, 7);
+  const rawBranch = emp.branch;
+  const branch: Branch = (['corporate', 'ap_zone', 'ts_zone'].includes(rawBranch) ? rawBranch : null)
+    || (emp.zone === 'TS' ? 'ts_zone' : emp.zone === 'AP' ? 'ap_zone' : 'corporate');
+  const hierarchyLevel: HierarchyLevel = (emp.hierarchy_level as HierarchyLevel) || 'be';
+  const zone: PharmaZone = (emp.zone as PharmaZone) || (branch === 'ts_zone' ? 'TS' : branch === 'ap_zone' ? 'AP' : 'Corporate');
+
+  const isLeadership = ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes(hierarchyLevel);
+  const managedBranches: Branch[] = Array.isArray(emp.managed_branches) && emp.managed_branches.length > 0
+    ? emp.managed_branches
+    : (isLeadership ? ['corporate', 'ts_zone', 'ap_zone'] : [branch]);
+
+  const isCorporateAdmin = isExemptAdmin(emp);
+  const resolvedRole: 'admin' | 'employee' = isCorporateAdmin ? 'admin' : 'employee';
+  const designation: string = emp.designation || (hierarchyLevel === 'rsm' ? 'RSM' : hierarchyLevel === 'zsm' ? 'ZSM' : hierarchyLevel === 'admin' ? 'Corporate Admin' : 'BE');
+
+  const leaveBalance: LeaveBalance = {
+    sick: { allowed: 6, taken: 0 },
+    casual: { allowed: emp.cl_balance !== undefined && emp.cl_balance !== null ? Number(emp.cl_balance) : 12, taken: 0 }
+  };
+  if (emp.gender === 'female') {
+    leaveBalance.maternity = { allowed: 90, taken: 0 };
+  } else if (emp.gender === 'male') {
+    leaveBalance.paternity = { allowed: 7, taken: 0 };
+  }
+
+  return {
+    id: emp.id,
+    employeeCode: emp.employee_code || emp.id,
+    name: emp.name,
+    email: emp.email,
+    designation,
+    joiningDate: emp.joining_date || new Date().toISOString().split('T')[0],
+    basicSalary: Number(emp.basic_pay) || 0,
+    role: resolvedRole,
+    status: (emp.status || 'active') as 'active' | 'inactive' | 'pending',
+    phone: emp.phone,
+    gender: emp.gender as 'male' | 'female' | 'other' | undefined,
+    experience: Number(emp.experience) || 0,
+    bankDetails: emp.bank_details as any,
+    hospital: 'orca_labs' as Hospital,
+    branch,
+    zone,
+    territory: emp.territory || undefined,
+    teamId: emp.team_id || undefined,
+    hierarchyLevel,
+    managedBranches,
+    reportingTo: emp.reporting_to || undefined,
+    isCheckedIn: !!emp.is_checked_in,
+    leaveBalance,
+    monthlyQuota: { id: 'virtual', month: currentMonth, allotted: 3, used: 0, remaining: 3 },
     leaveRequests: [],
     attendanceRecords: [],
     checkInLogs: [],
     payslips: [],
     locationPins: [],
     advanceRequests: []
-  });
-
-  return mappedEmployees;
+  };
 }
 
 /**
@@ -338,7 +370,7 @@ export async function createEmployee(emp: Omit<Employee, 'isCheckedIn' | 'leaveB
     employee_code: emp.employeeCode || emp.id,
     name: emp.name,
     email: emp.email,
-    password: emp.password || 'password',
+    password: emp.password || (Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4)),
     role: emp.role || 'employee',
     designation: emp.designation || 'Business Executive',
     joining_date: emp.joiningDate || new Date().toISOString().split('T')[0],

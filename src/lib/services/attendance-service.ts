@@ -1,7 +1,6 @@
 import { supabase } from '../supabase-client';
+import { apiFetch } from '../api-client';
 import { AttendanceStatus, PunchType } from '../../types';
-
-
 
 export async function clockInEmployee(
   empId: string, 
@@ -11,6 +10,27 @@ export async function clockInEmployee(
   punchType: PunchType = 'in_office',
   punchNote?: string
 ): Promise<void> {
+  // Authoritative Gateway: FastAPI Backend (/api/attendance/clock-in)
+  try {
+    await apiFetch('/attendance/clock-in', {
+      method: 'POST',
+      body: JSON.stringify({
+        employee_id: empId,
+        location: location || null,
+        lat_lng: latLng || null,
+        photo_url: photoUrl || null,
+        punch_type: punchType,
+        punch_note: punchNote || null
+      })
+    });
+    return;
+  } catch (apiErr: any) {
+    if (apiErr?.message?.includes('already has an active open session')) {
+      throw apiErr;
+    }
+    console.warn('Backend /attendance/clock-in unavailable, attempting Supabase fallback:', apiErr);
+  }
+
   const todayStr = new Date().toISOString().split('T')[0];
   const timeStr = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
 
@@ -62,6 +82,22 @@ export async function clockOutEmployee(
   location?: string,
   latLng?: string
 ): Promise<void> {
+  // Authoritative Gateway: FastAPI Backend (/api/attendance/clock-out)
+  try {
+    await apiFetch('/attendance/clock-out', {
+      method: 'POST',
+      body: JSON.stringify({
+        employee_id: empId,
+        photo_url: photoUrl || null,
+        location: location || null,
+        lat_lng: latLng || null
+      })
+    });
+    return;
+  } catch (apiErr: any) {
+    console.warn('Backend /attendance/clock-out unavailable, attempting Supabase fallback:', apiErr);
+  }
+
   const todayStr = new Date().toISOString().split('T')[0];
   const timeStr = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
 

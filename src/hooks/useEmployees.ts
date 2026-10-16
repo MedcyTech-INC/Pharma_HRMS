@@ -5,35 +5,16 @@ import * as employeeService from '../lib/services/employee-service';
 export function useEmployees() {
   const [employees, setEmployees] = useState<Employee[]>(() => {
     try {
-      // Actively purge any legacy Medcy/Vizag IVF cache key
+      // Actively purge any legacy or local dump cache
       localStorage.removeItem('hrms_local_employees');
-
-      const saved = localStorage.getItem('pharma_hrms_local_employees');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (
-          Array.isArray(parsed) && 
-          parsed.length > 0 && 
-          parsed.every(e => (e.id || '').toUpperCase().startsWith('OL') && e.id !== 'OL001')
-        ) {
-          return parsed;
-        }
-      }
+      localStorage.removeItem('pharma_hrms_local_employees');
       return [];
     } catch {
       return [];
     }
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const saveLocalData = (emps: Employee[]) => {
-    try {
-      localStorage.setItem('pharma_hrms_local_employees', JSON.stringify(emps));
-    } catch (storageErr) {
-      console.warn('Could not cache employees to localStorage:', storageErr);
-    }
-  };
 
   const loadData = useCallback(async () => {
     try {
@@ -48,7 +29,6 @@ export function useEmployees() {
 
       const emps = await employeeService.fetchAllEmployeesData();
       setEmployees(emps);
-      saveLocalData(emps);
     } catch (err: any) {
       console.error('Error fetching Supabase employee data:', err);
       const errDetails = err?.message || err?.details || 'Database connection offline.';
@@ -81,9 +61,7 @@ export function useEmployees() {
   const changePassword = async (id: string, newPassword: string) => {
     await employeeService.updateEmployeePassword(id, newPassword);
     setEmployees(prev => {
-      const updated = prev.map(e => e.id === id ? { ...e, password: newPassword } : e);
-      saveLocalData(updated);
-      return updated;
+      return prev.map(e => e.id === id ? { ...e, password: newPassword } : e);
     });
     await loadData();
   };

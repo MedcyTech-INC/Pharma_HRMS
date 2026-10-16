@@ -1,7 +1,24 @@
 import { supabase } from '../supabase-client';
+import { apiFetch } from '../api-client';
 import { LeaveRequest, LeaveType } from '../../types';
 
 export async function submitLeaveRequest(empId: string, leave: Omit<LeaveRequest, 'id'>): Promise<void> {
+  try {
+    await apiFetch('/leaves/apply', {
+      method: 'POST',
+      body: JSON.stringify({
+        employee_id: empId,
+        leave_type: leave.type,
+        from_date: leave.fromDate,
+        to_date: leave.toDate,
+        reason: leave.reason
+      })
+    });
+    return;
+  } catch (apiErr) {
+    console.warn('Backend /leaves/apply failed, falling back to Supabase:', apiErr);
+  }
+
   const { error } = await supabase
     .from('pharma_hrms_leave_requests')
     .insert([{
@@ -17,6 +34,17 @@ export async function submitLeaveRequest(empId: string, leave: Omit<LeaveRequest
 }
 
 export async function updateLeaveRequestStatus(requestId: string, approverId: string, status: 'Approved' | 'Rejected', adminNote?: string): Promise<void> {
+  const action = status === 'Approved' ? 'approve' : 'reject';
+  try {
+    await apiFetch(`/leaves/${requestId}/${action}`, {
+      method: 'POST',
+      body: JSON.stringify({ admin_note: adminNote || '' })
+    });
+    return;
+  } catch (apiErr) {
+    console.warn(`Backend /leaves/${requestId}/${action} failed, attempting legacy Supabase fallback:`, apiErr);
+  }
+
   const { data: request, error: fetchErr } = await supabase
     .from('pharma_hrms_leave_requests')
     .select('*')

@@ -147,8 +147,10 @@ export default function App() {
   const { holidays, todayHoliday, nextHoliday, holidayEve, isLoading: holidaysLoading } = useHolidays();
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (currentUserId) {
+      loadData();
+    }
+  }, [currentUserId, loadData]);
 
   // --- Auto Route On Role Change ---
   useEffect(() => {
@@ -237,7 +239,7 @@ export default function App() {
         <LoginScreen
           employees={employees}
           onLoginSuccess={(emp) => {
-            login(emp.id);
+            login(emp.id, emp);
             if (emp.hierarchyLevel === 'executive') {
               setActiveTab('executiveOverview');
             } else if (isExemptAdmin(emp)) {
