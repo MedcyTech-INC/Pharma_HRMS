@@ -1,4 +1,5 @@
 import { supabase } from '../supabase-client';
+import { apiFetch } from '../api-client';
 import { Employee, Payslip, isExemptAdmin } from '../../types';
 import { decrementInstallment } from './advance-service';
 import { fetchPayrollConfig, PayrollConfig } from './payroll-config-service';
@@ -40,6 +41,32 @@ export async function savePayslipToSupabase(empId: string, payslip: Payslip): Pr
     payslip.allowances.reduce((sum, a) => sum + a.amount, 0) - 
     totalDeductions;
 
+  // Authoritative Gateway: FastAPI Backend (/api/payroll/payslip)
+  try {
+    await apiFetch('/payroll/payslip', {
+      method: 'POST',
+      body: JSON.stringify({
+        employee_id: empId,
+        month: payslip.month,
+        basic_pay: payslip.basicPay,
+        allowances: payslip.allowances,
+        deductions: payslip.deductions,
+        net_pay: netPay,
+        advance_money_taken: payslip.advanceMoneyTaken || false,
+        advance_money_amount: payslip.advanceMoneyAmount || 0,
+        working_days: payslip.workingDays ?? null,
+        days_present: payslip.daysPresent ?? null,
+        leaves_taken: payslip.leavesTaken ?? null
+      })
+    });
+    return;
+  } catch (apiErr: any) {
+    if (apiErr?.message?.includes('finalized and locked')) {
+      throw apiErr;
+    }
+    console.warn('Backend /payroll/payslip unavailable, attempting Supabase fallback:', apiErr);
+  }
+
   const { data: existing } = await supabase
     .from('pharma_hrms_payroll')
     .select('id')
@@ -76,6 +103,20 @@ export async function savePayslipToSupabase(empId: string, payslip: Payslip): Pr
 }
 
 export async function runBulkPayrollForMonth(employees: Employee[], month: string): Promise<void> {
+  // Authoritative Gateway: FastAPI Backend (/api/payroll/bulk-run)
+  try {
+    await apiFetch('/payroll/bulk-run', {
+      method: 'POST',
+      body: JSON.stringify({ month })
+    });
+    return;
+  } catch (apiErr: any) {
+    if (apiErr?.message?.includes('finalized and locked')) {
+      throw apiErr;
+    }
+    console.warn('Backend /payroll/bulk-run unavailable, attempting client calculation fallback:', apiErr);
+  }
+
   // Fetch dynamic config from DB (or use defaults on failure)
   const config = await fetchPayrollConfig();
 

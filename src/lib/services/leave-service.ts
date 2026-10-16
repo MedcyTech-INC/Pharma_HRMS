@@ -15,7 +15,10 @@ export async function submitLeaveRequest(empId: string, leave: Omit<LeaveRequest
       })
     });
     return;
-  } catch (apiErr) {
+  } catch (apiErr: any) {
+    if (apiErr?.message?.includes('Not authorized') || apiErr?.message?.includes('forbidden') || apiErr?.message?.includes('conflict')) {
+      throw apiErr;
+    }
     console.warn('Backend /leaves/apply failed, falling back to Supabase:', apiErr);
   }
 
@@ -41,7 +44,10 @@ export async function updateLeaveRequestStatus(requestId: string, approverId: st
       body: JSON.stringify({ admin_note: adminNote || '' })
     });
     return;
-  } catch (apiErr) {
+  } catch (apiErr: any) {
+    if (apiErr?.message?.includes('Not authorized') || apiErr?.message?.includes('Cannot approve') || apiErr?.message?.includes('forbidden')) {
+      throw apiErr;
+    }
     console.warn(`Backend /leaves/${requestId}/${action} failed, attempting legacy Supabase fallback:`, apiErr);
   }
 
