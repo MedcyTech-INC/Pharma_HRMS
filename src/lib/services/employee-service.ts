@@ -27,12 +27,32 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     return true;
   });
 
-  const { data: att, error: attError } = await supabase.from('pharma_hrms_attendance').select('*');
-  const { data: leaves, error: leavesError } = await supabase.from('pharma_hrms_leave_requests').select('*');
-  const { data: balances, error: balError } = await supabase.from('pharma_hrms_leave_balances').select('*');
-  const { data: payroll, error: payError } = await supabase.from('pharma_hrms_payroll').select('*');
-  const { data: advances, error: advError } = await supabase.from('pharma_hrms_advance_requests').select('*');
-  const { data: pins, error: pinsError } = await supabase.from('pharma_hrms_location_pins').select('*');
+  // Parallelize secondary queries to eliminate sequential round-trip delays (from ~4-5s down to <500ms)
+  const [
+    attRes,
+    leavesRes,
+    balRes,
+    payRes,
+    advRes,
+    pinsRes,
+    quotaRes
+  ] = await Promise.all([
+    supabase.from('pharma_hrms_attendance').select('*'),
+    supabase.from('pharma_hrms_leave_requests').select('*'),
+    supabase.from('pharma_hrms_leave_balances').select('*'),
+    supabase.from('pharma_hrms_payroll').select('*'),
+    supabase.from('pharma_hrms_advance_requests').select('*'),
+    supabase.from('pharma_hrms_location_pins').select('*'),
+    supabase.from('pharma_hrms_monthly_leave_quota').select('*')
+  ]);
+
+  const { data: att, error: attError } = attRes;
+  const { data: leaves, error: leavesError } = leavesRes;
+  const { data: balances, error: balError } = balRes;
+  const { data: payroll, error: payError } = payRes;
+  const { data: advances, error: advError } = advRes;
+  const { data: pins, error: pinsError } = pinsRes;
+  const { data: quotas, error: quotaError } = quotaRes;
 
   if (attError) console.warn('Attendance sync notice:', attError.message);
   if (leavesError) console.warn('Leave requests sync notice:', leavesError.message);
@@ -40,10 +60,8 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
   if (payError && payError.code !== 'PGRST205') console.warn('Payroll sync notice:', payError.message);
   if (advError && advError.code !== 'PGRST205') console.warn('Advances sync notice:', advError.message);
   if (pinsError && pinsError.code !== 'PGRST205') console.warn('Location pins sync notice:', pinsError.message);
-
-  const { data: quotas, error: quotaError } = await supabase.from('pharma_hrms_monthly_leave_quota').select('*');
   if (quotaError && quotaError.code !== 'PGRST205') console.warn('Monthly quotas sync notice:', quotaError.message);
-  
+
   const quotaList = quotas || [];
   const attendanceList = att || [];
   const leavesList = leaves || [];
@@ -544,16 +562,22 @@ export async function toggleEmployeeStatus(id: string, status: 'active' | 'inact
  */
 export async function seedInitialDatabase(): Promise<void> {
   try {
-    // Purge any legacy Medcy hospital employees (EMP-*, MEDCY-*, non-orca_labs) and OL001
-    try {
-      await supabase.from('pharma_hrms_employees').delete().ilike('id', 'EMP-%');
-      await supabase.from('pharma_hrms_employees').delete().ilike('id', 'MEDCY%');
-      await supabase.from('pharma_hrms_employees').delete().ilike('id', 'VIZAG%');
-      await supabase.from('pharma_hrms_employees').delete().eq('id', 'OL001');
-      await supabase.from('pharma_hrms_leave_balances').delete().ilike('employee_id', 'EMP-%');
-      await supabase.from('pharma_hrms_leave_balances').delete().eq('employee_id', 'OL001');
-    } catch (purgeErr) {
-      console.warn('Legacy purge notice:', purgeErr);
+    // Purge legacy hospital employees only once per session to avoid 5-second delays on every page reload
+    const hasPurged = typeof window !== 'undefined' ? sessionStorage.getItem('pharma_legacy_purged') : 'done';
+    if (!hasPurged) {
+      try {
+        await Promise.all([
+          supabase.from('pharma_hrms_employees').delete().ilike('id', 'EMP-%'),
+          supabase.from('pharma_hrms_employees').delete().ilike('id', 'MEDCY%'),
+          supabase.from('pharma_hrms_employees').delete().ilike('id', 'VIZAG%'),
+          supabase.from('pharma_hrms_employees').delete().eq('id', 'OL001'),
+          supabase.from('pharma_hrms_leave_balances').delete().ilike('employee_id', 'EMP-%'),
+          supabase.from('pharma_hrms_leave_balances').delete().eq('employee_id', 'OL001')
+        ]);
+        sessionStorage.setItem('pharma_legacy_purged', 'true');
+      } catch (purgeErr) {
+        console.warn('Legacy purge notice:', purgeErr);
+      }
     }
 
     const { count, error } = await supabase

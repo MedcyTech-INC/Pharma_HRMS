@@ -17,8 +17,8 @@ RUN npm ci --prefer-offline --no-audit || npm install --legacy-peer-deps
 COPY . .
 
 # Build-time environment arguments (with production fallbacks if not explicitly provided)
-ARG VITE_SUPABASE_URL=""
-ARG VITE_SUPABASE_ANON_KEY=""
+ARG VITE_SUPABASE_URL="https://srv1674496.hstgr.cloud"
+ARG VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc4ODY5MDUxLCJleHAiOjIwOTQyMjkwNTF9.NiS-C4ehy7uR_O1KVimHDL-HiDacCQ7WbohsiGNP5ak"
 ARG VITE_COMPANY_NAME="Orca Labs"
 ARG VITE_APP_TITLE="Orca Labs Pharma HRMS"
 ARG VITE_GOOGLE_MAPS_API_KEY=""
