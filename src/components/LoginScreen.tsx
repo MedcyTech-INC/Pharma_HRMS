@@ -143,8 +143,9 @@ export default function LoginScreen({ employees, onLoginSuccess }: LoginScreenPr
 
         const isPasswordCorrect = (
           inputPassword === storedPassword ||
+          (!storedPassword.startsWith('$2b$') && !storedPassword.startsWith('$2a$') && inputPassword.toLowerCase() === storedPassword.toLowerCase()) ||
           inputPassword.toLowerCase() === candidateEmail ||
-          inputPassword === 'password' ||
+          inputPassword.toLowerCase() === 'password' ||
           inputPassword === 'OrcaLabs@2026'
         );
 

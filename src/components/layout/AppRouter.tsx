@@ -1,5 +1,5 @@
 import React from 'react';
-import { Employee, Language, Task, PunchType, LeaveBalance, PinType, Holiday } from '../../types';
+import { Employee, Language, Task, PunchType, LeaveBalance, LeaveType, PinType, Holiday } from '../../types';
 
 // Lazy Loaded Modules
 const DashboardSnapshot = React.lazy(() => import('../DashboardSnapshot'));
@@ -42,9 +42,9 @@ interface AppRouterProps {
  onAddEmployee: (emp: any) => Promise<void>;
  onUpdateEmployee: (id: string, fields: Partial<Employee>) => Promise<void>;
  onDeleteEmployee: (id: string) => Promise<void>;
- onUpdateBalances: (empId: string, balances: LeaveBalance) => Promise<void>;
+ onUpdateBalances: (empId: string, type: LeaveType, allotted: number, used: number) => Promise<void>;
  onUpdateAttendance: (employeeId: string, date: string, status: any, checkInTime?: string, checkOutTime?: string, sessionNumber?: number) => Promise<void>;
- onForceCloseSession: (employeeId: string, date: string, sessionNumber?: number) => Promise<void>;
+ onForceCloseSession: (employeeId: string, date: string, time?: string) => Promise<void>;
  onCreateTask: (task: any) => Promise<any>;
  onUpdateTask: (id: string, updates: any) => Promise<any>;
  onDeleteTask: (id: string) => Promise<any>;

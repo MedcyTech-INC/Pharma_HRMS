@@ -233,9 +233,9 @@ export function MessagingModule({ currentUser, employees }: MessagingModuleProps
        </button>
        
        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shrink-0 ${
-        selectedUser === 'group' ? 'bg-gradient-to-tr from-emerald-400 to-teal-500' : 'bg-slate-300 text-slate-600'
+        selectedUser && 'isGroup' in selectedUser ? 'bg-gradient-to-tr from-emerald-400 to-teal-500' : 'bg-slate-300 text-slate-600'
        }`}>
-        {selectedUser && 'isGroup' in selectedUser ? getInitials(selectedUser.name) : getInitials(selectedUser.name)}
+        {selectedUser ? getInitials(selectedUser.name) : ''}
        </div>
        
        

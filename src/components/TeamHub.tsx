@@ -116,7 +116,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
   const approvalTasks = useMemo(() => {
     return teamTasks.filter(t => {
       // Direct pending approval status or completed tasks needing manager sign-off
-      const isPending = t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'pending' || t.approvalStatus === 'not_required'));
+      const isPending = t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'not_required'));
       if (approvalFilter === 'pending') {
         return isPending && t.approvalStatus !== 'approved' && t.approvalStatus !== 'rejected';
       }
@@ -132,7 +132,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
 
   const pendingCount = useMemo(() => {
     return teamTasks.filter(t => 
-      (t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'pending' || t.approvalStatus === 'not_required'))) &&
+      (t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'not_required'))) &&
       t.approvalStatus !== 'approved' &&
       t.approvalStatus !== 'rejected'
     ).length;
@@ -153,7 +153,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
       if (statusFilter === 'offline') return !member.isCheckedIn;
       if (statusFilter === 'on_leave') {
         const todayStr = new Date().toISOString().split('T')[0];
-        return member.attendanceRecords?.some(r => r.date === todayStr && r.status === 'on_leave');
+        return member.attendanceRecords?.some(r => r.date === todayStr && (r.status === 'leave' || (r.status as string) === 'on_leave'));
       }
 
       return true;
@@ -471,9 +471,9 @@ export const TeamHub: React.FC<TeamHubProps> = ({
                           <span>Duty Status:</span>
                           <span className="font-semibold text-[#1C1C1E]">
                             {member.isCheckedIn 
-                              ? latestCheckIn?.timestamp 
-                                ? `In since ${new Date(latestCheckIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                                : 'Punched In'
+                              ? (latestCheckIn?.checkInTime 
+                                  ? `In since ${latestCheckIn.checkInTime.slice(0, 5)}` 
+                                  : 'Punched In')
                               : 'Not on duty today'}
                           </span>
                         </div>

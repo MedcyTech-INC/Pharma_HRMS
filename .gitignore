@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 .pnp
 .pnp.js
@@ -9,9 +9,8 @@ dist-ssr/
 build/
 out/
 
-# Separate backend folder (kept locally, not tracked in frontend repo)
+# Separate backend folder (kept locally in separate repo)
 backend/
-frontend/
 
 # Local environment & secrets
 .env

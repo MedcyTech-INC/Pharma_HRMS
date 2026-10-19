@@ -54,12 +54,13 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
     const dateStr = d.toISOString().split('T')[0];
     const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
     const record = member.attendanceRecords?.find(r => r.date === dateStr);
+    const log = member.checkInLogs?.find(l => l.date === dateStr);
     
     let status: 'present' | 'absent' | 'leave' | 'weekend' = 'absent';
     if (d.getDay() === 0) {
       status = 'weekend';
     } else if (record) {
-      status = record.status === 'present' ? 'present' : record.status === 'on_leave' ? 'leave' : 'absent';
+      status = (record.status as string) === 'present' ? 'present' : (record.status as string) === 'leave' || (record.status as string) === 'on_leave' ? 'leave' : 'absent';
     } else if (i === 6 && member.isCheckedIn) {
       status = 'present';
     }
@@ -70,7 +71,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
       dayNum: d.getDate(),
       isToday: i === 6,
       status,
-      checkInTime: record?.checkInTime || (i === 6 && member.isCheckedIn ? 'Checked In' : null)
+      checkInTime: log?.checkInTime || (i === 6 && member.isCheckedIn ? 'Checked In' : null)
     };
   });
 
@@ -296,19 +297,23 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
                 <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Casual</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {member.leaveBalance?.casual ?? 0} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
+                  {typeof member.leaveBalance?.casual === 'object' 
+                    ? ((member.leaveBalance.casual?.allowed ?? 0) - (member.leaveBalance.casual?.taken ?? 0))
+                    : Number(member.leaveBalance?.casual ?? 0)} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
               </div>
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
                 <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Sick</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {member.leaveBalance?.sick ?? 0} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
+                  {typeof member.leaveBalance?.sick === 'object'
+                    ? ((member.leaveBalance.sick?.allowed ?? 0) - (member.leaveBalance.sick?.taken ?? 0))
+                    : Number(member.leaveBalance?.sick ?? 0)} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
               </div>
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
-                <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Earned</span>
+                <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Monthly Quota</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {member.leaveBalance?.earned ?? 0} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
+                  {member.monthlyQuota?.remaining ?? 3} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
               </div>
             </div>

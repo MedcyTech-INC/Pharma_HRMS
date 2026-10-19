@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { Employee, FieldVisit } from '../types';
+import { Employee, FieldVisit, PharmaCallCategory } from '../types';
 import { bulkCreateVisits } from '../lib/services/field-visit-service';
 
 interface BulkUploadModalProps {
@@ -114,7 +114,7 @@ export default function BulkUploadModal({ onClose, employees, currentUser, onSuc
         }
         
         const cat = String(data['Category'] || 'doctor').trim().toLowerCase();
-        const validCategory = ['doctor', 'chemist', 'stockist', 'hospital'].includes(cat) ? cat : 'doctor';
+        const validCategory = (['doctor', 'chemist', 'stockist', 'hospital'].includes(cat) ? cat : 'doctor') as PharmaCallCategory;
         const targetName = data['Target Name']?.toString() || data['Title']?.toString() || 'Doctor Visit';
 
         return {
