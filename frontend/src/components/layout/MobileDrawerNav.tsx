@@ -18,7 +18,7 @@ import {
  Camera,
  UserCheck
 } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee, isExemptAdmin } from '../../types';
 
 interface MobileDrawerNavProps {
  isOpen: boolean;
@@ -37,20 +37,24 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
  onSelectTab,
  onOpenProfile
 }) => {
- const isExecutive = currentUser.hierarchyLevel === 'executive';
+ const isCorporateAdmin = isExemptAdmin(currentUser);
+ const isExecutive = currentUser.hierarchyLevel === 'executive' || currentUser.hierarchyLevel === 'admin' || isCorporateAdmin;
  const isManager = currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'rsm';
  const isSeniorManager = currentUser.hierarchyLevel === 'senior_manager';
  const isTeamLead = currentUser.hierarchyLevel === 'team_lead' || currentUser.hierarchyLevel === 'rsm';
- const isAdmin = currentUser.role === 'admin' || isExecutive || isManager || isSeniorManager || isTeamLead;
+ const isAdmin = currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin' || isExecutive || isManager || isSeniorManager || isTeamLead || isCorporateAdmin;
 
  let roleSubtitle = currentUser.designation || 'Staff';
- if (isExecutive) {
+ if (isCorporateAdmin) {
+  roleSubtitle = `${currentUser.designation || 'Corporate Admin'} · Corporate HQ`;
+ } else if (isExecutive) {
   roleSubtitle = 'Executive · Both Branches';
  } else if (isManager) {
   roleSubtitle = 'Operations Manager · Both Branches';
  } else if (currentUser.branch) {
   roleSubtitle = `${currentUser.designation || 'Staff'} · ${currentUser.branch === 'visakhapatnam' ? 'Vizag' : 'Vizianagaram'}`;
  }
+
 
  const [hasCompletedTour, setHasCompletedTour] = React.useState<boolean>(() => {
   return localStorage.getItem(`has_completed_tour_${currentUser.id}`) === 'true';

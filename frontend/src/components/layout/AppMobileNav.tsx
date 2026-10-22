@@ -12,7 +12,7 @@ import {
  Settings,
  Radio
 } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee, isExemptAdmin } from '../../types';
 
 interface AppMobileNavProps {
  currentUser: Employee;
@@ -25,7 +25,8 @@ export const AppMobileNav: React.FC<AppMobileNavProps> = ({
  activeTab,
  onSelectTab
 }) => {
- const isAdmin = currentUser.role === 'admin';
+ const isAdmin = currentUser.role === 'admin' || isExemptAdmin(currentUser) || currentUser.hierarchyLevel === 'admin';
+
 
  return (
   <nav id="mobile-navigation"className="print:hidden lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] flex items-center overflow-x-auto px-4 py-1 gap-2 z-40 no-print hide-scrollbar">

@@ -201,21 +201,27 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
 
     // Direct database mapping for Branch, Hierarchy, Zone, and Reporting lines
     const rawBranch = emp.branch;
+    const rawHierarchy = (emp.hierarchy_level as HierarchyLevel);
+    const isCorporateAdmin = isExemptAdmin(emp);
+    const hierarchyLevel: HierarchyLevel = isCorporateAdmin
+      ? (rawHierarchy && rawHierarchy !== 'be' ? rawHierarchy : 'admin')
+      : (rawHierarchy || 'be');
     const branch: Branch = (['corporate', 'ap_zone', 'ts_zone'].includes(rawBranch) ? rawBranch : null)
       || (emp.zone === 'TS' ? 'ts_zone' : emp.zone === 'AP' ? 'ap_zone' : 'corporate');
-    const hierarchyLevel: HierarchyLevel = (emp.hierarchy_level as HierarchyLevel) || 'be';
-    const zone: PharmaZone = (emp.zone as PharmaZone) || (branch === 'ts_zone' ? 'TS' : branch === 'ap_zone' ? 'AP' : 'Corporate');
+    const zone: PharmaZone = isCorporateAdmin
+      ? 'Corporate'
+      : ((emp.zone as PharmaZone) || (branch === 'ts_zone' ? 'TS' : branch === 'ap_zone' ? 'AP' : 'Corporate'));
 
-    const isLeadership = ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes(hierarchyLevel);
+    const isLeadership = ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes(hierarchyLevel) || isCorporateAdmin;
     const managedBranches: Branch[] = Array.isArray(emp.managed_branches) && emp.managed_branches.length > 0
       ? emp.managed_branches
       : (isLeadership ? ['corporate', 'ts_zone', 'ap_zone'] : [branch]);
 
     const reportingTo: string | undefined = emp.reporting_to || undefined;
-    // Only corporate admins (Aswani & Divya) have role 'admin'. All others (ZSMs, RSMs, BEs) have role 'employee'.
-    const isCorporateAdmin = isExemptAdmin(emp);
-    const resolvedRole: 'admin' | 'employee' = isCorporateAdmin ? 'admin' : 'employee';
-    const designation: string = emp.designation || (hierarchyLevel === 'rsm' ? 'RSM' : hierarchyLevel === 'zsm' ? 'ZSM' : hierarchyLevel === 'admin' ? 'Corporate Admin' : 'BE');
+    // Corporate admins (Aswani, Divya, Aishwarya) have role 'admin'. All others (ZSMs, RSMs, BEs) have role 'employee'.
+    const resolvedRole: 'admin' | 'employee' = (isCorporateAdmin || emp.role === 'admin') ? 'admin' : 'employee';
+    const designation: string = emp.designation || (isCorporateAdmin ? 'Corporate Admin' : hierarchyLevel === 'rsm' ? 'RSM' : hierarchyLevel === 'zsm' ? 'ZSM' : hierarchyLevel === 'admin' ? 'Corporate Admin' : 'BE');
+
 
     return {
       id: emp.id,
@@ -348,9 +354,10 @@ export function filterEmployeesByScope(
   if (!currentUser) return allEmployees;
 
   // Admin & Corporate tier: Complete visibility
-  if (currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin' || currentUser.hierarchyLevel === 'executive') {
+  if (currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin' || currentUser.hierarchyLevel === 'executive' || isExemptAdmin(currentUser)) {
     return allEmployees;
   }
+
   
   // ZSM (Zonal Sales Manager): Visibility across their entire zone (AP or TS)
   if (currentUser.hierarchyLevel === 'zsm') {

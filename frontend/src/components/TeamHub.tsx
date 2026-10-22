@@ -22,8 +22,9 @@ import {
   Sparkles,
   Award
 } from 'lucide-react';
-import { Employee, Task, TaskPriority, TaskApprovalStatus, Language } from '../types';
+import { Employee, Task, TaskPriority, TaskApprovalStatus, Language, isExemptAdmin } from '../types';
 import { MemberDetailSheet } from './MemberDetailSheet';
+
 
 interface TeamHubProps {
   language?: Language;
@@ -72,11 +73,13 @@ export const TeamHub: React.FC<TeamHubProps> = ({
     const isExecOrAdmin = 
       currentUser.hierarchyLevel === 'executive' || 
       currentUser.hierarchyLevel === 'admin' || 
-      currentUser.role === 'admin';
+      currentUser.role === 'admin' ||
+      isExemptAdmin(currentUser);
 
     if (isExecOrAdmin) {
       return employees.filter(e => e.id !== currentUser.id);
     }
+
 
     // Direct reports linked by reportingTo
     const reports = employees.filter(e => 

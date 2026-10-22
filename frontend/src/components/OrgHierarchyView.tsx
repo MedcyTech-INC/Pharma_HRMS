@@ -83,6 +83,11 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
     const divya = findEmp('OL009') || { id: 'OL009', name: 'N V DIVYA SIRISHA', designation: 'HR & FIN' } as Employee;
     const aswani = findEmp('OL026') || { id: 'OL026', name: 'P ASWANI', designation: 'GM' } as Employee;
     const suneel = findEmp('OL001') || { id: 'OL001', name: 'Suneel Kumar Kovuri', designation: 'Executive GM' } as Employee;
+    const aishwarya = findEmp('OL102') || allEmployees.find(e => {
+      const n = (e.name || '').toLowerCase();
+      return n.includes('aishwarya') || n.includes('aiswarya');
+    }) || ({ id: 'OL102', name: 'Aishwarya', designation: 'ADMIN' } as Employee);
+
 
     // 2. AP Zone
     const janardhan = findEmp('OL004') || { id: 'OL004', name: 'B V JANARDHAN', designation: 'ZSM(AP)' } as Employee;
@@ -178,10 +183,11 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
     ];
 
     return {
-      leadership: { suneel, divya, aswani },
+      leadership: { suneel, divya, aswani, aishwarya },
       ap: { zsm: janardhan, branches: apBranches },
       ts: { zsm: ramendra, branches: tsBranches }
     };
+
   }, [allEmployees, findEmp]);
 
   // Search match helper
@@ -327,11 +333,11 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
           className="w-max mx-auto pt-2 pb-8 flex flex-col items-center"
         >
           {/* ========================================================= */}
-          {/* LEVEL 1: CORPORATE ADMINS (ASWANI, DIVYA)                */}
+          {/* LEVEL 1: CORPORATE ADMINS (ASWANI, DIVYA, AISHWARYA)      */}
           {/* ========================================================= */}
           <div className="flex justify-center mb-0 relative z-10">
-            <div className={`bg-white border border-slate-200/90 rounded-2xl w-72 shadow-sm overflow-hidden flex flex-col z-10 transition-all hover:shadow-md ${
-              isMatch(hierarchyData.leadership.divya) || isMatch(hierarchyData.leadership.aswani)
+            <div className={`bg-white border border-slate-200/90 rounded-2xl w-auto min-w-[320px] max-w-md shadow-sm overflow-hidden flex flex-col z-10 transition-all hover:shadow-md ${
+              isMatch(hierarchyData.leadership.divya) || isMatch(hierarchyData.leadership.aswani) || isMatch(hierarchyData.leadership.aishwarya)
                 ? 'ring-2 ring-teal-500'
                 : ''
             }`}>
@@ -347,11 +353,11 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-3.5 flex items-center justify-around gap-4">
+              <div className="p-3.5 flex items-center justify-around gap-3">
                 {/* P. Aswani */}
                 <div className="flex flex-col items-center text-center">
                   <Avatar employee={hierarchyData.leadership.aswani} size="lg" />
-                  <span className="text-xs font-bold text-slate-800 mt-1 max-w-[100px] truncate" title={hierarchyData.leadership.aswani.name}>
+                  <span className="text-xs font-bold text-slate-800 mt-1 max-w-[90px] truncate" title={hierarchyData.leadership.aswani.name}>
                     {hierarchyData.leadership.aswani.name}
                   </span>
                   <span className="text-[9px] font-black text-teal-600 tracking-wider uppercase">GM</span>
@@ -362,17 +368,32 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
                 {/* Divya Sirisha */}
                 <div className="flex flex-col items-center text-center">
                   <Avatar employee={hierarchyData.leadership.divya} size="lg" />
-                  <span className="text-xs font-bold text-slate-800 mt-1 max-w-[100px] truncate" title={hierarchyData.leadership.divya.name}>
+                  <span className="text-xs font-bold text-slate-800 mt-1 max-w-[90px] truncate" title={hierarchyData.leadership.divya.name}>
                     {hierarchyData.leadership.divya.name}
                   </span>
                   <span className="text-[9px] font-black text-teal-600 tracking-wider uppercase">HR & FIN</span>
                 </div>
+
+                {hierarchyData.leadership.aishwarya && (
+                  <>
+                    <div className="w-px h-10 bg-slate-200"></div>
+                    {/* Aishwarya */}
+                    <div className="flex flex-col items-center text-center">
+                      <Avatar employee={hierarchyData.leadership.aishwarya} size="lg" />
+                      <span className="text-xs font-bold text-slate-800 mt-1 max-w-[90px] truncate" title={hierarchyData.leadership.aishwarya.name}>
+                        {hierarchyData.leadership.aishwarya.name}
+                      </span>
+                      <span className="text-[9px] font-black text-teal-600 tracking-wider uppercase">{hierarchyData.leadership.aishwarya.designation || 'ADMIN'}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="px-3.5 py-1.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center mt-auto">
-                <span className="text-[10px] text-slate-500 font-medium">35 Total Personnel • 2 Zonal Wings</span>
+                <span className="text-[10px] text-slate-500 font-medium">Corporate Leadership Team</span>
                 <span className="text-[10px] font-bold text-teal-600">Corporate HQ</span>
               </div>
+
             </div>
           </div>
 
@@ -744,7 +765,7 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
                 <span className="text-xs font-bold text-slate-800">Admins</span>
                 <span className="text-[9px] font-black text-teal-600 uppercase">Corporate HQ</span>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="flex flex-col items-center">
                   <Avatar employee={hierarchyData.leadership.aswani} size="md" />
                   <span className="text-[11px] font-bold text-slate-800 mt-1 truncate w-full">{hierarchyData.leadership.aswani.name}</span>
@@ -755,7 +776,13 @@ export const OrgHierarchyView: React.FC<OrgHierarchyViewProps> = ({
                   <span className="text-[11px] font-bold text-slate-800 mt-1 truncate w-full">{hierarchyData.leadership.divya.name}</span>
                   <span className="text-[8px] text-teal-600 font-bold">HR & FIN</span>
                 </div>
+                <div className="flex flex-col items-center">
+                  <Avatar employee={hierarchyData.leadership.aishwarya} size="md" />
+                  <span className="text-[11px] font-bold text-slate-800 mt-1 truncate w-full">{hierarchyData.leadership.aishwarya.name}</span>
+                  <span className="text-[8px] text-teal-600 font-bold">{hierarchyData.leadership.aishwarya.designation || 'ADMIN'}</span>
+                </div>
               </div>
+
             </div>
           </div>
 
