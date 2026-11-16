@@ -78,31 +78,35 @@ export const TeamHub: React.FC<TeamHubProps> = ({
       return employees.filter(e => e.id !== currentUser.id);
     }
 
-    // Direct reports linked by reportingTo
-    const reports = employees.filter(e => 
-      e.reportingTo === currentUser.id || 
-      e.reportingTo === currentUser.employeeCode ||
-      (e.reportingTo && e.reportingTo.toLowerCase() === currentUser.name.toLowerCase())
-    );
-
-    // Fallback if reportingTo is not populated yet
-    if (reports.length === 0) {
-      if (currentUser.hierarchyLevel === 'zsm') {
-        return employees.filter(e => 
-          e.id !== currentUser.id && 
-          (e.zone === currentUser.zone || e.branch === currentUser.branch)
-        );
-      }
-      if (currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'team_lead') {
-        return employees.filter(e => 
-          e.id !== currentUser.id && 
-          (e.hierarchyLevel === 'be' || e.role === 'employee') && 
-          (e.zone === currentUser.zone || e.branch === currentUser.branch)
-        );
-      }
+    // ZSM (Zonal Sales Manager): Direct oversight of entire zonal fleet (RSMs + BEs)
+    if (currentUser.hierarchyLevel === 'zsm') {
+      return employees.filter(e => 
+        e.id !== currentUser.id && 
+        (e.zone === currentUser.zone || e.branch === currentUser.branch || e.reportingTo === currentUser.id)
+      );
     }
 
-    return reports;
+    // RSM / Regional Manager: Direct reports linked by reportingTo (ID, employeeCode, or normalized name)
+    const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const reports = employees.filter(e => {
+      if (e.id === currentUser.id) return false;
+      if (!e.reportingTo) return false;
+      const rep = e.reportingTo.trim();
+      if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+      const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+    });
+
+    if (reports.length > 0) {
+      return reports;
+    }
+
+    // Fallback if reportingTo is not populated yet: territory/zone BEs
+    return employees.filter(e => 
+      e.id !== currentUser.id && 
+      (e.hierarchyLevel === 'be' || e.role === 'employee') && 
+      (e.zone === currentUser.zone || e.branch === currentUser.branch)
+    );
   }, [employees, currentUser]);
 
   const directReportIds = useMemo(() => new Set(directReports.map(e => e.id)), [directReports]);
@@ -116,7 +120,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
   const approvalTasks = useMemo(() => {
     return teamTasks.filter(t => {
       // Direct pending approval status or completed tasks needing manager sign-off
-      const isPending = t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'pending' || t.approvalStatus === 'not_required'));
+      const isPending = t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || (t.approvalStatus as string) === 'pending' || t.approvalStatus === 'not_required'));
       if (approvalFilter === 'pending') {
         return isPending && t.approvalStatus !== 'approved' && t.approvalStatus !== 'rejected';
       }
@@ -132,7 +136,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
 
   const pendingCount = useMemo(() => {
     return teamTasks.filter(t => 
-      (t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'pending' || t.approvalStatus === 'not_required'))) &&
+      (t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || (t.approvalStatus as string) === 'pending' || t.approvalStatus === 'not_required'))) &&
       t.approvalStatus !== 'approved' &&
       t.approvalStatus !== 'rejected'
     ).length;
@@ -153,7 +157,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
       if (statusFilter === 'offline') return !member.isCheckedIn;
       if (statusFilter === 'on_leave') {
         const todayStr = new Date().toISOString().split('T')[0];
-        return member.attendanceRecords?.some(r => r.date === todayStr && r.status === 'on_leave');
+        return member.attendanceRecords?.some(r => r.date === todayStr && (r.status === 'leave' || (r.status as string) === 'on_leave'));
       }
 
       return true;
@@ -471,8 +475,8 @@ export const TeamHub: React.FC<TeamHubProps> = ({
                           <span>Duty Status:</span>
                           <span className="font-semibold text-[#1C1C1E]">
                             {member.isCheckedIn 
-                              ? latestCheckIn?.timestamp 
-                                ? `In since ${new Date(latestCheckIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                              ? latestCheckIn?.checkInTime 
+                                ? `In since ${latestCheckIn.checkInTime}` 
                                 : 'Punched In'
                               : 'Not on duty today'}
                           </span>

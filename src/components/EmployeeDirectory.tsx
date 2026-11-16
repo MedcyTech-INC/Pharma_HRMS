@@ -7,6 +7,7 @@ import LeaveModule from './LeaveModule';
 import ExperienceLetter from './ExperienceLetter';
 
 interface EmployeeDirectoryProps {
+ currentUser?: Employee;
  language: Language;
  employees: Employee[];
  onAddEmployee: (emp: Partial<Employee>) => void;
@@ -20,6 +21,7 @@ interface EmployeeDirectoryProps {
 }
 
 export default function EmployeeDirectory({
+ currentUser,
  language,
  employees,
  onAddEmployee,
@@ -31,6 +33,9 @@ export default function EmployeeDirectory({
  onUpdateLeaveBalances,
 }: EmployeeDirectoryProps) {
  const t = translations[language];
+ const canManageEmployees = currentUser 
+  ? (currentUser.role === 'admin' || currentUser.hierarchyLevel === 'executive' || currentUser.hierarchyLevel === 'admin' || isExemptAdmin(currentUser))
+  : true;
 
  // UI state
  const [inspectingEmpId, setInspectingEmpId] = useState<string | null>(null);
@@ -65,7 +70,7 @@ export default function EmployeeDirectory({
  const [formRole, setFormRole] = useState<'admin' | 'employee'>('employee');
  const [formPhone, setFormPhone] = useState('');
  const [formPassword, setFormPassword] = useState('');
- const [formStatus, setFormStatus] = useState<'active' | 'inactive'>('active');
+ const [formStatus, setFormStatus] = useState<'active' | 'inactive' | 'pending'>('active');
  const [formBranch, setFormBranch] = useState<Branch>('ap_zone');
  const [formHierarchyLevel, setFormHierarchyLevel] = useState<HierarchyLevel>('be');
  const [formReportingTo, setFormReportingTo] = useState<string>('');
@@ -388,15 +393,17 @@ export default function EmployeeDirectory({
      {inspectSubTab === 'leave' && (
       <div className="p-4 sm:p-6">
        <LeaveModule
+        currentUser={currentUser}
+        canManageLeaves={canManageEmployees}
         language={language}
         leaveBalance={activeEmployee.leaveBalance}
         monthlyQuota={activeEmployee.monthlyQuota!}
         leaveRequests={activeEmployee.leaveRequests}
         gender={activeEmployee.gender}
         onApplyLeave={(type, from, to, reason) => onApplyEmployeeLeave(activeEmployee.id, type, from, to, reason)}
-        onApproveLeave={(reqId) => onApproveEmployeeLeave(activeEmployee.id, reqId)}
-        onRejectLeave={(reqId) => onRejectEmployeeLeave(activeEmployee.id, reqId)}
-        onUpdateBalances={(type, allotted, used) => onUpdateLeaveBalances(activeEmployee.id, type, allotted, used)}
+        onApproveLeave={canManageEmployees ? ((reqId) => onApproveEmployeeLeave(activeEmployee.id, reqId)) : (() => {})}
+        onRejectLeave={canManageEmployees ? ((reqId) => onRejectEmployeeLeave(activeEmployee.id, reqId)) : (() => {})}
+        onUpdateBalances={canManageEmployees ? ((type, allotted, used) => onUpdateLeaveBalances(activeEmployee.id, type, allotted, used)) : (() => {})}
        />
       </div>
      )}
@@ -481,14 +488,16 @@ export default function EmployeeDirectory({
       </button>
      </div>
 
-     <button
-      id="btn-add-employee"
-      onClick={handleOpenAdd}
-      className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-teal-600/15 cursor-pointer transition-all active:scale-95"
-     >
-      <Plus className="w-4 h-4"/>
-      <span>{dirText.btnNew}</span>
-     </button>
+     {canManageEmployees && (
+      <button
+       id="btn-add-employee"
+       onClick={handleOpenAdd}
+       className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-teal-600/15 cursor-pointer transition-all active:scale-95"
+      >
+       <Plus className="w-4 h-4"/>
+       <span>{dirText.btnNew}</span>
+      </button>
+     )}
     </div>
    </div>
 
@@ -665,29 +674,33 @@ export default function EmployeeDirectory({
 
          {/* Actions */}
          <td className="p-5 text-right"onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-end gap-2">
-           <button
-            onClick={(e) => handleOpenEdit(emp, e)}
-            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
-            title={dirText.editTitle}
-           >
-            <Edit3 className="w-3.5 h-3.5"/>
-           </button>
-           
-           {!isCorporateAdmin && (
+          {canManageEmployees ? (
+           <div className="flex items-center justify-end gap-2">
             <button
-             onClick={(e) => handleToggleStatus(emp.id, emp.name, emp.status || 'active', e)}
-             className={`p-2 rounded-lg transition-colors cursor-pointer ${
-              emp.status === 'inactive' 
-               ? 'text-teal-600 hover:bg-teal-50' 
-               : 'text-rose-400 hover:text-rose-600 hover:bg-rose-50'
-             }`}
-             title={emp.status === 'inactive' ? (language === 'te' ? 'యాక్టివేట్' : 'Reactivate') : (language === 'te' ? 'నిలిపివేయి' : 'Deactivate')}
+             onClick={(e) => handleOpenEdit(emp, e)}
+             className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+             title={dirText.editTitle}
             >
-             <Power className="w-3.5 h-3.5"/>
+             <Edit3 className="w-3.5 h-3.5"/>
             </button>
-           )}
-          </div>
+            
+            {!isCorporateAdmin && (
+             <button
+              onClick={(e) => handleToggleStatus(emp.id, emp.name, emp.status || 'active', e)}
+              className={`p-2 rounded-lg transition-colors cursor-pointer ${
+               emp.status === 'inactive' 
+                ? 'text-teal-600 hover:bg-teal-50' 
+                : 'text-rose-400 hover:text-rose-600 hover:bg-rose-50'
+              }`}
+              title={emp.status === 'inactive' ? (language === 'te' ? 'యాక్టివేట్' : 'Reactivate') : (language === 'te' ? 'నిలిపివేయి' : 'Deactivate')}
+             >
+              <Power className="w-3.5 h-3.5"/>
+             </button>
+            )}
+           </div>
+          ) : (
+           <span className="text-[11px] font-medium text-slate-400 px-2 py-1">View Only</span>
+          )}
          </td>
         </tr>
        );
@@ -914,7 +927,7 @@ export default function EmployeeDirectory({
          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status</label>
          <select
           value={formStatus}
-          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive')}
+          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive' | 'pending')}
           className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-700"
          >
           <option value="active">Active</option>
@@ -1177,7 +1190,7 @@ export default function EmployeeDirectory({
          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status</label>
          <select
           value={formStatus}
-          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive')}
+          onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive' | 'pending')}
           className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/10 text-slate-700"
          >
           <option value="active">Active</option>

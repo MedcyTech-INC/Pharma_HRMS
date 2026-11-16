@@ -18,7 +18,7 @@ import {
  Camera,
  UserCheck
 } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee, isExemptAdmin } from '../../types';
 
 interface MobileDrawerNavProps {
  isOpen: boolean;
@@ -37,19 +37,20 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
  onSelectTab,
  onOpenProfile
 }) => {
- const isExecutive = currentUser.hierarchyLevel === 'executive';
+ const isRoleAdmin = currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin';
+ const isExecutive = currentUser.hierarchyLevel === 'executive' || isExemptAdmin(currentUser) || isRoleAdmin;
  const isManager = currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'rsm';
  const isSeniorManager = currentUser.hierarchyLevel === 'senior_manager';
  const isTeamLead = currentUser.hierarchyLevel === 'team_lead' || currentUser.hierarchyLevel === 'rsm';
- const isAdmin = currentUser.role === 'admin' || isExecutive || isManager || isSeniorManager || isTeamLead;
+ const isAdmin = isRoleAdmin || isExecutive || isManager || isSeniorManager || isTeamLead;
 
  let roleSubtitle = currentUser.designation || 'Staff';
  if (isExecutive) {
-  roleSubtitle = 'Executive · Both Branches';
+  roleSubtitle = 'Executive · Corporate & Field Zones';
  } else if (isManager) {
-  roleSubtitle = 'Operations Manager · Both Branches';
- } else if (currentUser.branch) {
-  roleSubtitle = `${currentUser.designation || 'Staff'} · ${currentUser.branch === 'visakhapatnam' ? 'Vizag' : 'Vizianagaram'}`;
+  roleSubtitle = `${currentUser.designation || 'Zonal Operations'} · ${currentUser.zone || 'Pharma'}`;
+ } else if (currentUser.zone || currentUser.branch) {
+  roleSubtitle = `${currentUser.designation || 'Field Staff'} · ${currentUser.zone ? `${currentUser.zone} Zone` : 'Pharma'}`;
  }
 
  const [hasCompletedTour, setHasCompletedTour] = React.useState<boolean>(() => {
@@ -168,6 +169,20 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
      {isAdmin ? (
       /* --- ADMIN NAV BUTTONS --- */
       <>
+       {(!isExemptAdmin(currentUser) && (currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'manager')) && (
+        <button
+         onClick={() => handleTabClick('dashboard')}
+         className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
+          activeTab === 'dashboard'
+           ? 'bg-teal-50 text-teal-700 font-bold border border-teal-200'
+           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+         }`}
+        >
+         <Clock className={`w-4 h-4 shrink-0 ${activeTab === 'dashboard' ? 'text-teal-600' : 'text-slate-400'}`} />
+         <span>{currentUser.isCheckedIn ? 'My Duty (Active)' : 'Punch In / Duty'}</span>
+        </button>
+       )}
+
        {isExecutive && (
         <button
          onClick={() => handleTabClick('executiveOverview')}
@@ -258,6 +273,20 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
         <span>Leave Approvals</span>
        </button>
 
+       {(!isExemptAdmin(currentUser)) && (
+        <button
+         onClick={() => handleTabClick('leave')}
+         className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
+          activeTab === 'leave'
+           ? 'bg-teal-50 text-teal-700 font-bold border border-teal-200'
+           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+         }`}
+        >
+         <CalendarDays className={`w-4 h-4 shrink-0 ${activeTab === 'leave' ? 'text-teal-600' : 'text-slate-400'}`} />
+         <span>My Leaves</span>
+        </button>
+       )}
+
        <button
         onClick={() => handleTabClick('doctorPlanner')}
         className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
@@ -275,7 +304,7 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
         )}
        </button>
 
-       {isTeamLead && (
+       {(isTeamLead || currentUser.hierarchyLevel === 'zsm') && (
          <>
            <button
              onClick={() => handleTabClick('callCapture')}
@@ -302,7 +331,7 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
          </>
        )}
 
-       {(!isTeamLead && !isSeniorManager) && (
+       {isAdmin && (
          <button
          onClick={() => handleTabClick('officeLocations')}
          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
@@ -316,7 +345,7 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
          </button>
        )}
 
-       {(!isTeamLead && !isSeniorManager) && (
+       {isAdmin && (
          <button
          onClick={() => handleTabClick('fieldOps')}
          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
@@ -354,7 +383,7 @@ export const MobileDrawerNav: React.FC<MobileDrawerNavProps> = ({
         <span>Messages</span>
        </button>
 
-       {(!isTeamLead && !isSeniorManager) && (
+       {isAdmin && (
          <button
          onClick={() => handleTabClick('adminSettings')}
          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${

@@ -62,9 +62,34 @@ export default function AdminTaskManager({
  // Modal States
  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
- const fieldEmployees = employees.filter(
-  e => e.hierarchyLevel === 'be' || (e.hierarchyLevel !== 'executive' && e.hierarchyLevel !== 'admin')
- );
+ const fieldEmployees = useMemo(() => {
+  const isZSM = currentUser.hierarchyLevel === 'zsm';
+  const isRSM = currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'team_lead';
+
+  if (isZSM) {
+   return employees.filter(e => 
+    e.id !== currentUser.id && 
+    (e.zone === currentUser.zone || e.branch === currentUser.branch || e.reportingTo === currentUser.id)
+   );
+  }
+
+  if (isRSM) {
+   const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+   const directTeam = employees.filter(e => {
+    if (e.id === currentUser.id) return false;
+    if (!e.reportingTo) return false;
+    const rep = e.reportingTo.trim();
+    if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+    const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+   });
+   return directTeam.length > 0 ? directTeam : employees.filter(e => e.id !== currentUser.id && (e.hierarchyLevel === 'be' || e.role === 'employee') && (e.zone === currentUser.zone || e.branch === currentUser.branch));
+  }
+
+  return employees.filter(
+   e => e.hierarchyLevel === 'be' || (e.hierarchyLevel !== 'executive' && e.hierarchyLevel !== 'admin')
+  );
+ }, [employees, currentUser]);
  const [showCreateModal, setShowCreateModal] = useState(false);
  const [editingTask, setEditingTask] = useState<Task | null>(null);
  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
@@ -127,9 +152,19 @@ export default function AdminTaskManager({
     if (!descMatch && !notesMatch && !empMatch) return false;
    }
 
+   // For ZSM and RSM, restrict visible tasks to their scoped team or tasks assigned by them
+   const isLeadership = currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'team_lead';
+   if (isLeadership && currentUser.hierarchyLevel !== 'executive' && currentUser.hierarchyLevel !== 'admin' && currentUser.role !== 'admin') {
+    const allowedIds = new Set(fieldEmployees.map(e => e.id));
+    allowedIds.add(currentUser.id);
+    if (task.assignedTo && !allowedIds.has(task.assignedTo) && task.createdBy !== currentUser.id) {
+     return false;
+    }
+   }
+
    return true;
   });
- }, [tasks, timeFilter, selectedDate, assigneeFilter, priorityFilter, statusFilter, searchQuery, employeesMap, todayStr]);
+ }, [tasks, timeFilter, selectedDate, assigneeFilter, priorityFilter, statusFilter, searchQuery, employeesMap, todayStr, currentUser, fieldEmployees]);
 
  // Statistics
  const stats = useMemo(() => {

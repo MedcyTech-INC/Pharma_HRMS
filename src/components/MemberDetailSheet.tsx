@@ -59,7 +59,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
     if (d.getDay() === 0) {
       status = 'weekend';
     } else if (record) {
-      status = record.status === 'present' ? 'present' : record.status === 'on_leave' ? 'leave' : 'absent';
+      status = record.status === 'present' ? 'present' : (record.status === 'leave' || (record.status as string) === 'on_leave') ? 'leave' : 'absent';
     } else if (i === 6 && member.isCheckedIn) {
       status = 'present';
     }
@@ -70,7 +70,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
       dayNum: d.getDate(),
       isToday: i === 6,
       status,
-      checkInTime: record?.checkInTime || (i === 6 && member.isCheckedIn ? 'Checked In' : null)
+      checkInTime: (record as any)?.checkInTime || (i === 6 && member.isCheckedIn ? 'Checked In' : null)
     };
   });
 
@@ -296,19 +296,19 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
                 <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Casual</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {member.leaveBalance?.casual ?? 0} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
+                  {typeof member.leaveBalance?.casual === 'object' ? Math.max(0, (member.leaveBalance.casual.allowed || 12) - (member.leaveBalance.casual.taken || 0)) : (member.leaveBalance?.casual ?? 12)} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
               </div>
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
                 <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Sick</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {member.leaveBalance?.sick ?? 0} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
+                  {typeof member.leaveBalance?.sick === 'object' ? Math.max(0, (member.leaveBalance.sick.allowed || 4) - (member.leaveBalance.sick.taken || 0)) : (member.leaveBalance?.sick ?? 4)} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
               </div>
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
-                <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Earned</span>
+                <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Total Leaves</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {member.leaveBalance?.earned ?? 0} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
+                  {(typeof member.leaveBalance?.casual === 'object' ? Math.max(0, (member.leaveBalance.casual.allowed || 12) - (member.leaveBalance.casual.taken || 0)) : 12) + (typeof member.leaveBalance?.sick === 'object' ? Math.max(0, (member.leaveBalance.sick.allowed || 4) - (member.leaveBalance.sick.taken || 0)) : 4)} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
               </div>
             </div>
@@ -415,7 +415,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[11px] font-semibold text-[#8E8E93] uppercase mb-1">
                       Priority

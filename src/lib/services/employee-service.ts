@@ -56,7 +56,7 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     // Map leave balances
     const empBalances = balancesList.filter(b => b.employee_id === emp.id);
     const leaveBalance: LeaveBalance = {
-      sick: { allowed: 6, taken: 0 },
+      sick: { allowed: 4, taken: 0 },
       casual: { allowed: emp.cl_balance !== undefined && emp.cl_balance !== null ? Number(emp.cl_balance) : 12, taken: 0 }
     };
     if (emp.gender === 'female') {
@@ -67,7 +67,9 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     empBalances.forEach(b => {
       const type = b.leave_type as LeaveType;
       if (leaveBalance[type]) {
-        leaveBalance[type] = { allowed: b.total_allotted, taken: b.used };
+        // Enforce maximum 4 days policy for sick leaves (12 Casual + 4 Sick = 16 total leaves)
+        const allotted = type === 'sick' ? Math.min(Number(b.total_allotted), 4) : Number(b.total_allotted);
+        leaveBalance[type] = { allowed: allotted, taken: Number(b.used) };
       }
     });
 
@@ -263,14 +265,14 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     phone: '0000000000',
     gender: 'male',
     experience: 0,
-    bankDetails: {},
+    bankDetails: { accountNumber: '', bankName: '', ifsc: '' } as any,
     hospital: 'orca_labs',
     branch: 'corporate',
     zone: 'Corporate',
     hierarchyLevel: 'admin',
     managedBranches: ['corporate', 'ts_zone', 'ap_zone'],
     isCheckedIn: false,
-    leaveBalance: { sick: { allowed: 6, taken: 0 }, casual: { allowed: 12, taken: 0 }, paternity: { allowed: 7, taken: 0 } },
+    leaveBalance: { sick: { allowed: 4, taken: 0 }, casual: { allowed: 12, taken: 0 }, paternity: { allowed: 7, taken: 0 } },
     monthlyQuota: { id: 'virtual-test', month: currentMonth, allotted: 3, used: 0, remaining: 3 },
     leaveRequests: [],
     attendanceRecords: [],
@@ -316,13 +318,18 @@ export function filterEmployeesByScope(
   
   // RSM (Regional Sales Manager): Visibility over their direct reporting BEs
   if (currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'manager') {
-    return allEmployees.filter(emp => 
-      emp.reportingTo === currentUser.id || 
-      emp.id === currentUser.id ||
-      emp.hierarchyLevel === 'admin' ||
-      emp.hierarchyLevel === 'executive' ||
-      emp.hierarchyLevel === 'zsm'
-    );
+    const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return allEmployees.filter(emp => {
+      if (emp.id === currentUser.id) return true;
+      if (emp.hierarchyLevel === 'admin' || emp.hierarchyLevel === 'executive' || emp.hierarchyLevel === 'zsm') return true;
+      if (!emp.reportingTo) {
+        return (emp.hierarchyLevel === 'be' || emp.role === 'employee') && (emp.zone === currentUser.zone || emp.branch === currentUser.branch);
+      }
+      const rep = emp.reportingTo.trim();
+      if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+      const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+    });
   }
 
   // Business Executive (BE) tier: Personal record
@@ -415,10 +422,10 @@ export async function bulkCreateEmployees(employees: Partial<Employee>[]): Promi
     throw error;
   }
 
-  // Generate leave balances
+  // Generate leave balances (Orca Labs: 12 Casual + 4 Sick = 16 Total)
   const initialBalances: any[] = [];
   employees.forEach(emp => {
-    initialBalances.push({ employee_id: emp.id, leave_type: 'sick', total_allotted: 6, used: 0 });
+    initialBalances.push({ employee_id: emp.id, leave_type: 'sick', total_allotted: 4, used: 0 });
     initialBalances.push({ employee_id: emp.id, leave_type: 'casual', total_allotted: 12, used: 0 });
     if (emp.gender === 'female') {
       initialBalances.push({ employee_id: emp.id, leave_type: 'maternity', total_allotted: 90, used: 0 });

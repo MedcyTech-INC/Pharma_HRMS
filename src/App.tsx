@@ -53,6 +53,7 @@ export default function App() {
       'admin-dashboard': 'adminDashboard',
       'directory': 'directory',
       'attendance-overview': 'attendanceOverview',
+      'team-attendance': 'attendanceOverview',
       'leave-approvals': 'leaveApprovals',
       'office-locations': 'officeLocations',
       'messages': 'messages',
@@ -61,7 +62,9 @@ export default function App() {
       'call-capture': 'callCapture',
       'field-ops': 'fieldOps',
       'tasks': 'tasks',
-      'admin-tasks': 'adminTasks'
+      'admin-tasks': 'adminTasks',
+      'team-hub': 'teamHub',
+      'doctor-planner': 'doctorPlanner'
     };
     
     if (pathToTab[path]) return pathToTab[path];
@@ -93,7 +96,8 @@ export default function App() {
       'fieldOps': 'field-ops',
       'tasks': 'tasks',
       'adminTasks': 'admin-tasks',
-      'teamHub': 'team-hub'
+      'teamHub': 'team-hub',
+      'doctorPlanner': 'doctor-planner'
     };
     
     const newPath = '/' + (tabToPath[activeTab] || activeTab);
@@ -115,6 +119,7 @@ export default function App() {
         'admin-dashboard': 'adminDashboard',
         'directory': 'directory',
         'team-attendance': 'attendanceOverview',
+        'attendance-overview': 'attendanceOverview',
         'leave-approvals': 'leaveApprovals',
         'office-locations': 'officeLocations',
         'messages': 'messages',
@@ -124,7 +129,8 @@ export default function App() {
         'field-ops': 'fieldOps',
         'tasks': 'tasks',
         'admin-tasks': 'adminTasks',
-        'team-hub': 'teamHub'
+        'team-hub': 'teamHub',
+        'doctor-planner': 'doctorPlanner'
       };
       
       if (pathToTab[path]) {
@@ -154,23 +160,27 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     
+    const level = currentUser.hierarchyLevel || 'be';
     const isCorporateAdmin = isExemptAdmin(currentUser);
-    const isExecutive = currentUser.hierarchyLevel === 'executive';
-    const isManager = currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'rsm';
-    const isAdminLevel = isCorporateAdmin || isExecutive || isManager;
+    const isRoleAdmin = currentUser.role === 'admin' || level === 'admin';
+    const isExecutive = level === 'executive' || isCorporateAdmin || isRoleAdmin;
+    const isZSM = level === 'zsm';
+    const isRSM = level === 'rsm' || level === 'team_lead' || level === 'manager';
+    const isManagerOrZSM = isZSM || isRSM;
+    const isAdminLevel = isExecutive || isManagerOrZSM;
 
     const adminTabs = [
       'dashboard', 'adminDashboard', 'directory', 'attendanceOverview', 'leaveApprovals',
       'officeLocations', 'messages', 'adminSettings', 'fieldOps', 'adminTasks',
       'executiveOverview', 'orgChart', 'doctorPlanner', 'fieldDuty', 'callCapture', 'attendance', 'leave',
-      'teamHub'
+      'teamHub', 'tasks'
     ];
     const employeeTabs = [
-      'dashboard', 'attendance', 'leave', 'messages', 'fieldDuty', 'callCapture', 'tasks', 'doctorPlanner'
+      'dashboard', 'attendance', 'leave', 'messages', 'fieldDuty', 'callCapture', 'tasks', 'doctorPlanner', 'directory', 'orgChart'
     ];
 
     if (isAdminLevel && !adminTabs.includes(activeTab)) {
-      setActiveTab(isExecutive ? 'executiveOverview' : 'adminDashboard');
+      setActiveTab('adminDashboard');
     } else if (!isAdminLevel && !employeeTabs.includes(activeTab)) {
       setActiveTab('dashboard');
     }
@@ -238,11 +248,15 @@ export default function App() {
           employees={employees}
           onLoginSuccess={(emp) => {
             login(emp.id);
-            if (emp.hierarchyLevel === 'executive') {
-              setActiveTab('executiveOverview');
-            } else if (isExemptAdmin(emp)) {
+            const level = emp.hierarchyLevel || 'be';
+            const isCorpAdmin = isExemptAdmin(emp);
+            const isRoleAdmin = emp.role === 'admin' || level === 'admin';
+            const isExec = level === 'executive' || isCorpAdmin || isRoleAdmin;
+            const isMgr = level === 'zsm' || level === 'rsm' || level === 'manager';
+
+            if (isExec) {
               setActiveTab('adminDashboard');
-            } else if (emp.hierarchyLevel === 'zsm' || emp.hierarchyLevel === 'rsm') {
+            } else if (isMgr) {
               setActiveTab(emp.isCheckedIn ? 'adminDashboard' : 'dashboard');
             } else {
               setActiveTab('dashboard');
@@ -267,11 +281,14 @@ export default function App() {
           currentUser={currentUser}
           onOpenProfile={() => setShowProfileModal(true)}
           onLogout={handleLogout}
-          onLogoClick={() => setActiveTab(
-            currentUser.hierarchyLevel === 'executive' 
-              ? 'executiveOverview' 
-              : ((isExemptAdmin(currentUser) || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'rsm') ? 'adminDashboard' : 'dashboard')
-          )}
+          onLogoClick={() => {
+            const level = currentUser.hierarchyLevel || 'be';
+            const isCorpAdmin = isExemptAdmin(currentUser);
+            const isRoleAdmin = currentUser.role === 'admin' || level === 'admin';
+            const isExec = level === 'executive' || isCorpAdmin || isRoleAdmin;
+            const isMgr = level === 'zsm' || level === 'rsm' || level === 'manager';
+            setActiveTab(isExec || isMgr ? 'adminDashboard' : 'dashboard');
+          }}
           onOpenMenu={() => setMobileNavOpen(true)}
         />
 
@@ -302,12 +319,13 @@ export default function App() {
           {/* Primary Content Router */}
         <main id="portal-primary-content" className={`flex-1 ${activeTab === 'orgChart' ? 'overflow-hidden p-2 sm:p-3' : 'overflow-y-auto px-4 sm:px-6 py-6 md:py-8 pb-24 lg:pb-8'} min-w-0 print:col-span-12 print:overflow-visible print:p-0 print:m-0`}>
             <React.Suspense fallback={
-              <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
+              <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4 animate-fadeIn">
                 <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading Module...</p>
               </div>
             }>
-              <AppRouter
+              <div key={activeTab} className="animate-moduleEnter w-full min-h-full">
+                <AppRouter
                 activeTab={activeTab}
                 language={language}
                 currentUser={currentUser}
@@ -344,6 +362,7 @@ export default function App() {
                 holidayEve={holidayEve}
                 holidaysLoading={holidaysLoading}
               />
+              </div>
             </React.Suspense>
           </main>
 

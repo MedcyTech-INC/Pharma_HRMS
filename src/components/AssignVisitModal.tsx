@@ -109,8 +109,23 @@ export default function AssignVisitModal({
 
   // Scoped employee list for Managers assigning tasks
   let selectableEmployees = employees.filter(e => e.status === 'active');
-  if (isRSM && !isSelfSchedule) {
-    selectableEmployees = employees.filter(e => e.reportingTo === currentUser?.id || e.id === currentUser?.id);
+  if (level === 'zsm' && !isSelfSchedule) {
+    selectableEmployees = employees.filter(e => 
+      e.status === 'active' && 
+      (e.zone === currentUser?.zone || e.branch === currentUser?.branch || e.reportingTo === currentUser?.id)
+    );
+  } else if (isRSM && !isSelfSchedule) {
+    const normalizedName = (currentUser?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const directTeam = employees.filter(e => {
+      if (e.status !== 'active') return false;
+      if (e.id === currentUser?.id) return true;
+      if (!e.reportingTo) return false;
+      const rep = e.reportingTo.trim();
+      if (rep === currentUser?.id || rep === currentUser?.employeeCode) return true;
+      const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+    });
+    selectableEmployees = directTeam.length > 0 ? directTeam : employees.filter(e => e.status === 'active' && (e.zone === currentUser?.zone || e.branch === currentUser?.branch));
   }
 
   // Determine Origin Point (Agent's Check-in Location > Fallback to Regional Hub)
@@ -260,6 +275,22 @@ export default function AssignVisitModal({
       .filter(([_, units]) => Number(units) > 0)
       .map(([sample, units]) => ({ sample, units: Number(units) }));
 
+    let finalLat = destLat;
+    let finalLng = destLng;
+    if ((!finalLat || !finalLng) && address.trim().length >= 3) {
+      try {
+        const directPlace = await searchNominatimDirect(address.trim());
+        if (directPlace) {
+          finalLat = directPlace.lat;
+          finalLng = directPlace.lng;
+          setDestLat(directPlace.lat);
+          setDestLng(directPlace.lng);
+        }
+      } catch (e) {
+        console.warn('Auto-geocoding fallback failed:', e);
+      }
+    }
+
     try {
       const created = await fieldVisitService.createVisit({
         employeeId: finalEmpId,
@@ -280,8 +311,8 @@ export default function AssignVisitModal({
         approvalStatus,
         approvedBy,
         assignedAddress: address,
-        assignedLatitude: destLat || undefined,
-        assignedLongitude: destLng || undefined,
+        assignedLatitude: finalLat || undefined,
+        assignedLongitude: finalLng || undefined,
         productsDetailed: productsPayload,
         samplesGiven: samplesPayload,
         pobAmount: Number(pobAmount) || 0
@@ -311,7 +342,7 @@ export default function AssignVisitModal({
               <h3 className="font-semibold text-[17px] text-[#1C1C1E] tracking-tight leading-snug">
                 {isSelfSchedule
                   ? (isBESelfScheduling ? 'Plan Field Call' : 'Schedule Pharma Call')
-                  : (isRSM ? 'Assign Team Call' : 'Assign Field Call')}
+                  : (level === 'zsm' ? 'Assign Zonal Team Call' : isRSM ? 'Assign Regional Team Call' : 'Assign Field Call')}
               </h3>
               <p className="text-[12px] text-[#8E8E93] font-normal mt-0.5">
                 Orca Labs Field Force — Medical Reps, Chemist POB &amp; Stockist Planning
@@ -667,7 +698,7 @@ export default function AssignVisitModal({
               ? 'Scheduling…'
               : (isSelfSchedule
                   ? (isBESelfScheduling ? 'Submit for RSM Approval' : 'Schedule Call')
-                  : (isRSM ? 'Assign Team Call' : 'Schedule Field Call'))}
+                  : (level === 'zsm' ? 'Assign Zonal Team Call' : isRSM ? 'Assign Regional Team Call' : 'Schedule Field Call'))}
           </button>
         </div>
       </div>

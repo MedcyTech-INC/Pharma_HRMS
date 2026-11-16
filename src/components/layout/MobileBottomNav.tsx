@@ -1,6 +1,6 @@
 import React from 'react';
 import { Home, Users, Moon, Menu, MapPin, LogOut } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee, isExemptAdmin } from '../../types';
 
 interface MobileBottomNavProps {
   currentUser: Employee;
@@ -17,9 +17,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenMenu,
   onLogout
 }) => {
-  const isExecutive = currentUser.hierarchyLevel === 'executive';
-  const isManager = currentUser.hierarchyLevel === 'manager';
-  const isAdmin = currentUser.role === 'admin' || isExecutive || isManager;
+  const level = currentUser.hierarchyLevel || 'be';
+  const isCorporateAdmin = isExemptAdmin(currentUser);
+  const isRoleAdmin = currentUser.role === 'admin' || level === 'admin';
+  const isExecutive = level === 'executive' || isCorporateAdmin || isRoleAdmin;
+  const isZSM = level === 'zsm';
+  const isRSM = level === 'rsm' || level === 'team_lead' || level === 'manager';
+  const isManagerOrZSM = isZSM || isRSM;
+  const isAdmin = isExecutive || isManagerOrZSM;
 
   const getNavClass = (tabId: string) => {
     const isActive = activeTab === tabId;

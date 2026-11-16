@@ -124,7 +124,7 @@ export default function BulkUploadModal({ onClose, employees, currentUser, onSuc
           scheduledDate: parsedDate,
           scheduledStart: data['Time']?.toString() || data['Start Time']?.toString() || '09:00',
           scheduledEnd: data['End Time']?.toString() || '10:00',
-          category: validCategory,
+          category: validCategory as any,
           doctorName: validCategory === 'doctor' ? targetName : undefined,
           clinicName: validCategory === 'doctor' ? data['Visit Location']?.toString() : undefined,
           chemistShopName: validCategory === 'chemist' ? targetName : undefined,

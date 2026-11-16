@@ -1,5 +1,5 @@
 import React from 'react';
-import { Employee, Language, Task, PunchType, LeaveBalance, PinType, Holiday } from '../../types';
+import { Employee, Language, Task, PunchType, LeaveBalance, LeaveType, PinType, Holiday } from '../../types';
 
 // Lazy Loaded Modules
 const DashboardSnapshot = React.lazy(() => import('../DashboardSnapshot'));
@@ -37,14 +37,14 @@ interface AppRouterProps {
  onToggleCheckIn: (userId: string, isCheckedIn: boolean, photoData?: string, punchType?: PunchType, punchNote?: string) => Promise<any>;
  onAddPin: (employeeId: string, label: string, pinType?: PinType, photoUrl?: string) => Promise<any>;
  onApplyLeave: (empId: string, req: any) => Promise<void>;
- onApproveLeave: (reqId: string, note?: string) => Promise<void>;
- onRejectLeave: (reqId: string, note?: string) => Promise<void>;
+ onApproveLeave: (reqId: string, approverId: string, note?: string) => Promise<void>;
+ onRejectLeave: (reqId: string, approverId: string, note?: string) => Promise<void>;
  onAddEmployee: (emp: any) => Promise<void>;
  onUpdateEmployee: (id: string, fields: Partial<Employee>) => Promise<void>;
  onDeleteEmployee: (id: string) => Promise<void>;
- onUpdateBalances: (empId: string, balances: LeaveBalance) => Promise<void>;
+ onUpdateBalances: (empId: string, type: LeaveType, allotted: number, used: number) => Promise<void>;
  onUpdateAttendance: (employeeId: string, date: string, status: any, checkInTime?: string, checkOutTime?: string, sessionNumber?: number) => Promise<void>;
- onForceCloseSession: (employeeId: string, date: string, sessionNumber?: number) => Promise<void>;
+ onForceCloseSession: (employeeId: string, date: string, time?: string) => Promise<void>;
  onCreateTask: (task: any) => Promise<any>;
  onUpdateTask: (id: string, updates: any) => Promise<any>;
  onDeleteTask: (id: string) => Promise<any>;
@@ -146,9 +146,13 @@ export const AppRouter: React.FC<AppRouterProps> = ({
     />
    );
 
-  case 'leave':
+  case 'leave': {
+   const isBE = currentUser.hierarchyLevel === 'be' || (!currentUser.hierarchyLevel && currentUser.role !== 'admin');
+   const canManageLeaves = !isBE && (currentUser.role === 'admin' || ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes(currentUser.hierarchyLevel || ''));
    return (
     <LeaveModule
+     currentUser={currentUser}
+     canManageLeaves={canManageLeaves}
      language={language}
      leaveBalance={currentUser.leaveBalance}
      monthlyQuota={currentUser.monthlyQuota!}
@@ -157,10 +161,11 @@ export const AppRouter: React.FC<AppRouterProps> = ({
      onApplyLeave={(type, fromDate, toDate, reason) =>
       onApplyLeave(currentUser.id, { type, fromDate, toDate, reason, status: 'pending', submittedAt: new Date().toISOString() })
      }
-     onApproveLeave={(reqId) => onApproveLeave(reqId, currentUser.id)}
-     onRejectLeave={(reqId) => onRejectLeave(reqId, currentUser.id)}
+     onApproveLeave={canManageLeaves ? ((reqId) => onApproveLeave(reqId, currentUser.id)) : undefined}
+     onRejectLeave={canManageLeaves ? ((reqId) => onRejectLeave(reqId, currentUser.id)) : undefined}
     />
    );
+  }
 
   // --- ADMIN MODULES ---
   case 'adminDashboard':
@@ -180,6 +185,7 @@ export const AppRouter: React.FC<AppRouterProps> = ({
   case 'directory':
    return (
     <EmployeeDirectory
+     currentUser={currentUser}
      language={language}
      employees={employees}
      onAddEmployee={onAddEmployee}
@@ -198,8 +204,11 @@ export const AppRouter: React.FC<AppRouterProps> = ({
     <AdminAttendance
      language={language}
      employees={employees}
+     currentUser={currentUser}
      onUpdateAttendance={onUpdateAttendance}
      onForceCloseSession={onForceCloseSession}
+     todayHoliday={todayHoliday}
+     holidays={holidays}
     />
    );
   case 'fieldOps':
@@ -218,8 +227,9 @@ export const AppRouter: React.FC<AppRouterProps> = ({
      language={language}
      currentUser={currentUser}
      employees={employees}
-     onApproveLeave={(_empId, reqId, _approverId, note) => onApproveLeave(reqId, note)}
-     onRejectLeave={(_empId, reqId, _approverId, note) => onRejectLeave(reqId, note)}
+     onApproveLeave={(_empId, reqId, approverId, note) => onApproveLeave(reqId, approverId || currentUser.id, note)}
+     onRejectLeave={(_empId, reqId, approverId, note) => onRejectLeave(reqId, approverId || currentUser.id, note)}
+     setActiveTab={setActiveTab}
     />
    );
   case 'doctorPlanner':

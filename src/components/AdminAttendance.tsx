@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, UserCheck, AlertCircle, ArrowLeft, Users, Check, Moon, HelpCircle, MapPin, Clock, FileWarning, CheckCircle, XCircle } from 'lucide-react';
-import { Language, Employee, AttendanceStatus, Branch, isExemptAdmin } from '../types';
+import { Language, Employee, AttendanceStatus, Branch, isExemptAdmin, Holiday } from '../types';
 import { translations } from '../translations';
 import { generateMonthOptions, formatMonth } from '../lib/utils';
 import LocationPinTimeline from './LocationPinTimeline';
@@ -8,17 +8,35 @@ import LocationPinTimeline from './LocationPinTimeline';
 interface AdminAttendanceProps {
  language: Language;
  employees: Employee[];
+ currentUser?: Employee;
  onUpdateAttendance: (empId: string, date: string, status: AttendanceStatus) => void;
  onForceCloseSession?: (empId: string, date: string, time?: string) => void;
+ todayHoliday?: Holiday | null;
+ holidays?: Holiday[];
 }
 
-export default function AdminAttendance({ language, employees, onUpdateAttendance, onForceCloseSession }: AdminAttendanceProps) {
+export default function AdminAttendance({ 
+ language, 
+ employees, 
+ currentUser,
+ onUpdateAttendance, 
+ onForceCloseSession,
+ todayHoliday = null,
+ holidays = []
+}: AdminAttendanceProps) {
  const t = translations[language];
+
+ const isZSM = currentUser?.hierarchyLevel === 'zsm';
+ const isRSM = currentUser?.hierarchyLevel === 'rsm' || currentUser?.hierarchyLevel === 'manager' || currentUser?.hierarchyLevel === 'team_lead';
 
  // Filters
  const monthOptions = generateMonthOptions(2018, 1);
  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0] || '2026-07');
- const [attendanceBranchFilter, setAttendanceBranchFilter] = useState<Branch | 'all'>('all');
+ const [attendanceBranchFilter, setAttendanceBranchFilter] = useState<Branch | 'all' | 'my_team'>(() => {
+  if (isRSM) return 'my_team';
+  if (isZSM) return currentUser?.zone === 'TS' ? 'ts_zone' : 'ap_zone';
+  return 'all';
+ });
  const [editTarget, setEditTarget] = useState<{empId: string, date: string, status: AttendanceStatus | 'blank'} | null>(null);
 
  const todayStr = new Date().toISOString().split('T')[0];
@@ -67,13 +85,40 @@ export default function AdminAttendance({ language, employees, onUpdateAttendanc
  };
 
  // Branch/zone-scoped employees
- const filteredEmployees = employees.filter(e => 
-  attendanceBranchFilter === 'all' ||
-  e.branch === attendanceBranchFilter ||
-  (attendanceBranchFilter === 'ap_zone' && (e.zone === 'AP' || e.branch === 'ap_zone')) ||
-  (attendanceBranchFilter === 'ts_zone' && (e.zone === 'TS' || e.branch === 'ts_zone')) ||
-  (attendanceBranchFilter === 'corporate' && (e.zone === 'Corporate' || e.branch === 'corporate'))
- );
+ const filteredEmployees = employees.filter(e => {
+  if (attendanceBranchFilter === 'my_team') {
+   if (!currentUser) return true;
+   if (e.id === currentUser.id) return true;
+   const myId = (currentUser.id || '').trim();
+   const myCode = (currentUser.employeeCode || '').trim().toLowerCase();
+   const myNameClean = (currentUser.name || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+   if (e.reportingTo) {
+     const rep = e.reportingTo.trim();
+     const repClean = rep.replace(/[^a-z0-9]/gi, '').toLowerCase();
+     if (
+       (myId && rep === myId) ||
+       (myCode && rep.toLowerCase() === myCode) ||
+       (myNameClean && (repClean === myNameClean || myNameClean.includes(repClean) || repClean.includes(myNameClean)))
+     ) {
+       return true;
+     }
+   }
+   // Fallback to territory or zone
+   return (
+     (currentUser.territory && e.territory === currentUser.territory) ||
+     (currentUser.zone && e.zone === currentUser.zone && e.hierarchyLevel === 'be')
+   );
+  }
+
+  return (
+   attendanceBranchFilter === 'all' ||
+   e.branch === attendanceBranchFilter ||
+   (attendanceBranchFilter === 'ap_zone' && (e.zone === 'AP' || e.branch === 'ap_zone')) ||
+   (attendanceBranchFilter === 'ts_zone' && (e.zone === 'TS' || e.branch === 'ts_zone')) ||
+   (attendanceBranchFilter === 'corporate' && (e.zone === 'Corporate' || e.branch === 'corporate'))
+  );
+ });
 
  // Calculate statistics for today across the scoped team (excluding exempt corporate admins)
  const totalEmployees = filteredEmployees.filter(e => !isExemptAdmin(e)).length;
@@ -90,7 +135,9 @@ export default function AdminAttendance({ language, employees, onUpdateAttendanc
   return todayRec && todayRec.status === 'leave';
  }).length;
 
- const absentToday = Math.max(0, totalEmployees - presentToday - leaveToday);
+ const isSunday = new Date().getDay() === 0;
+ const isTodayHoliday = Boolean(todayHoliday) || isSunday;
+ const absentToday = isTodayHoliday ? 0 : Math.max(0, totalEmployees - presentToday - leaveToday);
 
  // Generate days in the selected month
  const [yearStr, monthStr] = selectedMonth.split('-');
@@ -151,6 +198,16 @@ export default function AdminAttendance({ language, employees, onUpdateAttendanc
   }
  }[language];
 
+ let attendanceTitle = localizedText.title;
+ let attendanceSubtitle = localizedText.subtitle;
+ if (isZSM && currentUser?.zone) {
+  attendanceTitle = `${currentUser.zone} Zone Attendance Matrix`;
+  attendanceSubtitle = `Live attendance roster and time records for ${currentUser.zone} Zone field staff`;
+ } else if (isRSM) {
+  attendanceTitle = `${currentUser?.territory ? `${currentUser.territory} Region` : 'Regional'} Attendance Matrix`;
+  attendanceSubtitle = `Live attendance roster and time records for your regional field executive team`;
+ }
+
  return (
   <div id="admin-attendance-container"className="space-y-6 animate-fadeIn">
    
@@ -158,16 +215,28 @@ export default function AdminAttendance({ language, employees, onUpdateAttendanc
    <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
     <div>
      <h2 className="text-xl font-bold font-display text-slate-800">
-      {localizedText.title}
+      {attendanceTitle}
      </h2>
      <p className="text-xs text-slate-400 mt-1">
-      {localizedText.subtitle}
+      {attendanceSubtitle}
      </p>
     </div>
 
     <div className="flex items-center gap-3 flex-wrap">
      {/* Branch Filter Selector */}
      <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
+      {isRSM && (
+       <button
+        onClick={() => setAttendanceBranchFilter('my_team')}
+        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+         attendanceBranchFilter === 'my_team'
+          ? 'bg-white text-teal-700 shadow-sm font-bold'
+          : 'text-slate-500 hover:text-slate-800'
+        }`}
+       >
+        My Region ({currentUser?.territory || 'Team'})
+       </button>
+      )}
       <button
        onClick={() => setAttendanceBranchFilter('all')}
        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -259,12 +328,18 @@ export default function AdminAttendance({ language, employees, onUpdateAttendanc
      </div>
     </div>
 
-    {/* Absent Today */}
-    <div className="bg-white border border-rose-100 rounded-[24px] p-5 shadow-sm">
-     <span className="text-[9px] font-bold text-rose-600 uppercase tracking-wider block">{localizedText.absentToday}</span>
+    {/* Absent Today or Weekend/Holiday */}
+    <div className={`bg-white border rounded-[24px] p-5 shadow-sm ${isTodayHoliday ? 'border-slate-200' : 'border-rose-100'}`}>
+     <span className={`text-[9px] font-bold uppercase tracking-wider block ${isTodayHoliday ? 'text-slate-500' : 'text-rose-600'}`}>
+      {isTodayHoliday ? (todayHoliday?.name || (isSunday ? (language === 'te' ? 'ఆదివారం సెలవు' : 'Sunday Weekend') : (language === 'te' ? 'సెలవుదినం' : 'Public Holiday'))) : localizedText.absentToday}
+     </span>
      <div className="mt-2 flex items-baseline gap-1">
-      <span className="text-2xl font-black font-mono text-rose-800">{absentToday.toString().padStart(2, '0')}</span>
-      <span className="text-xs text-rose-500">{language === 'te' ? 'రాలేదు' : 'absent'}</span>
+      <span className={`text-2xl font-black font-mono ${isTodayHoliday ? 'text-slate-700' : 'text-rose-800'}`}>
+       {isTodayHoliday ? '00' : absentToday.toString().padStart(2, '0')}
+      </span>
+      <span className={`text-xs ${isTodayHoliday ? 'text-slate-400' : 'text-rose-500'}`}>
+       {isTodayHoliday ? (language === 'te' ? 'సెలవుదినం' : 'Off Duty') : (language === 'te' ? 'రాలేదు' : 'absent')}
+      </span>
      </div>
     </div>
    </div>
@@ -317,8 +392,12 @@ export default function AdminAttendance({ language, employees, onUpdateAttendanc
           
           {daysArray.map(dayNum => {
            const dayStr = formatDayNum(dayNum);
-           const rec = emp.attendanceRecords.find(r => r.date === dayStr);
-           const status: AttendanceStatus | 'blank' = rec ? rec.status : 'blank';
+           const rec = emp.attendanceRecords?.find(r => r.date === dayStr);
+           const isSundayDate = new Date(`${dayStr}T00:00:00`).getDay() === 0;
+           const isHol = holidays?.some(h => h.date === dayStr);
+           const status: AttendanceStatus | 'blank' = rec 
+             ? rec.status 
+             : (isHol ? 'holiday' : (isSundayDate ? 'weekoff' : 'blank'));
            
            // Render grid square
            return (

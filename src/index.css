@@ -7,11 +7,60 @@
   --font-mono: "JetBrains Mono", monospace;
   
   --animate-marquee: marquee 25s linear infinite;
+  --animate-fadeIn: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fadeSlide: fadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-moduleEnter: moduleEnter 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   
   @keyframes marquee {
     0% { transform: translateX(0%); }
     100% { transform: translateX(-50%); }
   }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeSlide {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes moduleEnter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Explicit CSS classes for universal support across Tailwind v4 & standard CSS */
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeSlide {
+  animation: fadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-moduleEnter {
+  animation: moduleEnter 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body {

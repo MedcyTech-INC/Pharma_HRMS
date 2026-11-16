@@ -100,8 +100,31 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
     if (isExecutive) {
       return employees.filter(e => e.id !== currentUser.id);
     }
-    if (isRSM || isZSM) {
-      return employees.filter(e => e.reportingTo === currentUser.id);
+    if (isZSM) {
+      // ZSM manages entire zonal fleet (RSMs + all BEs in their zone)
+      return employees.filter(e => 
+        e.id !== currentUser.id && 
+        (e.zone === currentUser.zone || e.branch === currentUser.branch || e.reportingTo === currentUser.id)
+      );
+    }
+    if (isRSM) {
+      const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const reports = employees.filter(e => {
+        if (e.id === currentUser.id) return false;
+        if (!e.reportingTo) return false;
+        const rep = e.reportingTo.trim();
+        if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+        const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+      });
+      if (reports.length > 0) return reports;
+
+      // Fallback: BEs in same zone/branch
+      return employees.filter(e => 
+        e.id !== currentUser.id && 
+        (e.hierarchyLevel === 'be' || e.role === 'employee') && 
+        (e.zone === currentUser.zone || e.branch === currentUser.branch)
+      );
     }
     return [];
   }, [employees, currentUser, isRSM, isZSM, isExecutive]);
