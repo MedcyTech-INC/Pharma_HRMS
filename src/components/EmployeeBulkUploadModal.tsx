@@ -20,17 +20,19 @@ export default function EmployeeBulkUploadModal({ onClose, employees, onSuccess 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = () => {
-    const headers = [
-      ['Name', 'Email', 'Designation', 'Phone', 'Gender']
+    const templateRows = [
+      ['Name', 'Email', 'Designation', 'Phone', 'Gender', 'Zone (AP/TS/Corporate)', 'Hierarchy Level (BE/RSM/ZSM/Admin)', 'Reporting Manager ID'],
+      ['Rajesh Varma', 'rajesh.varma@orcalabs.in', 'Business Executive', '9876543210', 'Male', 'AP', 'BE', 'OL008'],
+      ['Suresh Kumar', 'suresh.kumar@orcalabs.in', 'Regional Sales Manager', '9876543211', 'Male', 'TS', 'RSM', 'OL001']
     ];
-    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const ws = XLSX.utils.aoa_to_sheet(templateRows);
     // Set column widths for readability
     ws['!cols'] = [
-      { wch: 20 }, { wch: 28 }, { wch: 24 }, { wch: 16 }, { wch: 12 }
+      { wch: 22 }, { wch: 30 }, { wch: 26 }, { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 32 }, { wch: 22 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Employees');
-    XLSX.writeFile(wb, 'Employee_Upload_Template.xlsx');
+    XLSX.writeFile(wb, 'OrcaLabs_Employee_Upload_Template.xlsx');
   };
 
   const processFile = (selectedFile: File) => {
@@ -98,26 +100,52 @@ export default function EmployeeBulkUploadModal({ onClose, employees, onSuccess 
     setError(null);
 
     try {
-      const employeesPayload: Partial<Employee>[] = rows.map(r => {
+      // Find max numeric OL ID among current employees
+      const maxNumericId = employees.reduce((max, e) => {
+        const num = parseInt(e.id?.replace(/\D/g, '') || '0', 10);
+        return num > max ? num : max;
+      }, 30);
+
+      const employeesPayload: Partial<Employee>[] = rows.map((r, idx) => {
         const data = r.original;
         
-        // Generate a random ID since we aren't creating them via auth yet
-        const generatedId = `OL-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-        
+        // Form non-colliding sequential employee ID
+        const generatedId = `OL${(maxNumericId + idx + 1).toString().padStart(3, '0')}`;
+        const employeeId = data['Employee ID']?.toString() || data['ID']?.toString() || generatedId;
+
+        // Zone and branch normalization
+        const rawZone = (data['Zone (AP/TS/Corporate)'] || data['Zone'] || 'AP').toString().trim().toUpperCase();
+        const zone = rawZone.includes('TS') ? 'TS' : rawZone.includes('CORP') ? 'Corporate' : 'AP';
+        const branch = zone === 'TS' ? 'ts_zone' : zone === 'Corporate' ? 'corporate' : 'ap_zone';
+
+        // Hierarchy level normalization
+        const rawLevel = (data['Hierarchy Level (BE/RSM/ZSM/Admin)'] || data['Hierarchy Level'] || 'BE').toString().trim().toLowerCase();
+        let hierarchyLevel: 'be' | 'rsm' | 'zsm' | 'admin' | 'executive' = 'be';
+        if (rawLevel.includes('admin')) hierarchyLevel = 'admin';
+        else if (rawLevel.includes('exec')) hierarchyLevel = 'executive';
+        else if (rawLevel.includes('zsm')) hierarchyLevel = 'zsm';
+        else if (rawLevel.includes('rsm')) hierarchyLevel = 'rsm';
+
+        // Reporting manager
+        const reportingTo = (data['Reporting Manager ID'] || data['Reporting Manager'] || data['Reporting To'] || '').toString().trim();
+
+        const role = hierarchyLevel === 'admin' || hierarchyLevel === 'executive' ? 'admin' : 'employee';
+
         return {
-          id: data['Employee ID']?.toString() || generatedId,
-          employeeCode: data['Employee ID']?.toString() || generatedId,
+          id: employeeId,
+          employeeCode: employeeId,
           name: data['Name']?.toString() || 'Unknown',
-          email: data['Email']?.toString(),
-          designation: data['Designation']?.toString() || 'Business Executive',
-          phone: data['Phone']?.toString(),
-          hierarchyLevel: data['Hierarchy Level']?.toString()?.toLowerCase() || 'be',
-          zone: data['Zone']?.toString() || 'AP',
-          branch: data['Branch']?.toString() || 'ap_zone',
+          email: data['Email']?.toString()?.trim()?.toLowerCase(),
+          designation: data['Designation']?.toString() || (hierarchyLevel === 'be' ? 'Business Executive' : hierarchyLevel === 'rsm' ? 'Regional Sales Manager' : 'Zonal Sales Manager'),
+          phone: data['Phone']?.toString() || '',
+          hierarchyLevel,
+          zone,
+          branch,
+          reportingTo: reportingTo || undefined,
           password: 'password123',
-          gender: data['Gender']?.toString()?.toLowerCase() || 'male',
+          gender: (data['Gender']?.toString()?.toLowerCase().startsWith('f') ? 'female' : 'male') as 'male' | 'female',
           status: 'active',
-          role: 'employee',
+          role,
         };
       });
 

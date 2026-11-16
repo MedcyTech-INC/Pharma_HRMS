@@ -80,11 +80,19 @@ export default function UserProfileModal({ currentUser, onClose, onUpdatePasswor
   const trimmedNew = newPassword.trim();
   const trimmedConfirm = confirmPassword.trim();
 
-  // Verify current password against saved record
-  const expectedCurrent = currentUser.password || 'password';
-  if (trimmedCurrent !== expectedCurrent) {
-   setError(t.errCurrent);
-   return;
+  // Verify current password against saved record if known and in plaintext
+  const expectedCurrent = currentUser.password;
+  const isBcrypt = Boolean(expectedCurrent && (expectedCurrent.startsWith('$2a$') || expectedCurrent.startsWith('$2b$') || expectedCurrent.startsWith('$2y$')));
+  if (expectedCurrent && !isBcrypt) {
+    if (trimmedCurrent !== expectedCurrent) {
+      setError(t.errCurrent);
+      return;
+    }
+  } else {
+    if (!trimmedCurrent) {
+      setError(t.errCurrent);
+      return;
+    }
   }
 
   // Disallow setting the exact same password

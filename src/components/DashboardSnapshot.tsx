@@ -190,14 +190,35 @@ export default function DashboardSnapshot({
  const hasCheckedOutToday = !!(latestCheckIn && latestCheckIn.checkOutTime !== null);
  const currentMonthStr = new Date().toISOString().substring(0, 7);
  const presentDays = attendanceRecords.filter(r => r.date.startsWith(currentMonthStr) && r.status ==="present").length;
- const todayWorkedSecs = logs.filter(l => l.date === todayStr && l.checkOutTime !== null).reduce((acc, log) => {
+ const todayWorkedSecs = logs.filter(l => l.date === todayStr).reduce((acc, log) => {
   if (log.checkInTime && log.checkOutTime) {
    const [h1,m1,s1] = log.checkInTime.split(":").map(Number);
    const [h2,m2,s2] = log.checkOutTime.split(":").map(Number);
    return acc + ((h2*3600+m2*60+s2)-(h1*3600+m1*60+s1));
-  } return acc;
+  } else if (log.checkInTime && isCheckedIn) {
+   const [h1,m1,s1] = log.checkInTime.split(":").map(Number);
+   const now = new Date();
+   const curSecs = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+   const inSecs = (h1||0)*3600 + (m1||0)*60 + (s1||0);
+   return acc + Math.max(0, curSecs - inSecs);
+  }
+  return acc;
  }, 0);
  const todayWorkedHrs = (todayWorkedSecs / 3600).toFixed(2);
+
+ const getGreetingName = (name: string) => {
+  if (!name) return 'There';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  if (parts[0].replace(/\./g, '').length <= 2) {
+   const nonInitial = parts.find(p => p.replace(/\./g, '').length > 2);
+   if (nonInitial) {
+    return nonInitial.charAt(0).toUpperCase() + nonInitial.slice(1).toLowerCase();
+   }
+   return name;
+  }
+  return parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+ };
 
  return (
   <div id="dashboard-snapshot-container"className="space-y-6 sm:space-y-8 animate-fadeIn">
@@ -207,7 +228,7 @@ export default function DashboardSnapshot({
    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
     <div>
      <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-      Hello, {currentUser.name.split(' ')[0]}
+      Hello, {getGreetingName(currentUser.name)}
      </h2>
      <p className="text-sm font-medium text-slate-500 mt-1">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}</p>
     </div>

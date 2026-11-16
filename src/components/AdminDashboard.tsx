@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowRight, Users, CheckCircle, Clock, AlertCircle, MapPin, ChevronRight, Calendar, Sun, Moon } from 'lucide-react';
 import { Language, Employee, LeaveRequest, isExemptAdmin, Holiday } from '../types';
 import { translations } from '../translations';
@@ -39,24 +39,73 @@ export default function AdminDashboard({
     return () => clearInterval(timer);
   }, []);
 
-  // Calculate snapshot metrics
-  const totalEmployees = employees.length;
+  // Role and leadership resolution
+  const isCorporateAdmin = currentUser ? isExemptAdmin(currentUser) || currentUser.role === 'admin' || currentUser.hierarchyLevel === 'executive' : true;
+  const isZSM = currentUser?.hierarchyLevel === 'zsm';
+  const isRSM = currentUser?.hierarchyLevel === 'rsm' || currentUser?.hierarchyLevel === 'manager' || currentUser?.hierarchyLevel === 'team_lead';
+
+  const scopedEmployees = useMemo(() => {
+    if (!currentUser || isCorporateAdmin) {
+      return employees;
+    }
+    if (isZSM) {
+      return employees.filter(emp => 
+        (emp.zone === currentUser.zone || emp.branch === currentUser.branch)
+      );
+    }
+    if (isRSM) {
+      const myId = (currentUser.id || '').trim();
+      const myCode = (currentUser.employeeCode || '').trim().toLowerCase();
+      const myNameClean = (currentUser.name || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+      const direct = employees.filter(emp => {
+        if (!emp.reportingTo) return false;
+        const rep = emp.reportingTo.trim();
+        const repClean = rep.replace(/[^a-z0-9]/gi, '').toLowerCase();
+        return (
+          (myId && rep === myId) ||
+          (myCode && rep.toLowerCase() === myCode) ||
+          (myNameClean && (repClean === myNameClean || myNameClean.includes(repClean) || repClean.includes(myNameClean)))
+        );
+      });
+
+      if (direct.length > 0) return direct;
+      return employees.filter(emp => 
+        emp.id !== currentUser.id && (
+          (currentUser.territory && emp.territory === currentUser.territory) ||
+          (currentUser.zone && emp.zone === currentUser.zone && emp.hierarchyLevel === 'be')
+        )
+      );
+    }
+    return employees;
+  }, [employees, currentUser, isCorporateAdmin, isZSM, isRSM]);
+
+  // Calculate snapshot metrics based on scoped leadership
+  const totalEmployees = scopedEmployees.length;
   
   // Checking active today
-  const checkedInToday = employees.filter(emp => emp.isCheckedIn).length;
+  const checkedInToday = scopedEmployees.filter(emp => emp.isCheckedIn).length;
   
-  const inactiveEmployees = employees.filter(emp => emp.status === 'inactive').length;
+  const inactiveEmployees = scopedEmployees.filter(emp => emp.status?.toLowerCase() === 'inactive').length;
   
-  // Pending leaves across everyone
+  // Pending leaves across scoped team (excluding self)
   const pendingRequests: { req: LeaveRequest; empName: string; empId: string }[] = [];
-  employees.forEach(emp => {
-    emp.leaveRequests.forEach(req => {
-      if (req.status === 'pending') {
+  scopedEmployees.forEach(emp => {
+    if (emp.id === currentUser?.id) return;
+    emp.leaveRequests?.forEach(req => {
+      if (req.status?.toLowerCase() === 'pending') {
         pendingRequests.push({ req, empName: emp.name, empId: emp.id });
       }
     });
   });
   const pendingCount = pendingRequests.length;
+
+  let dashboardSubtitle = "Orca Labs Pharmaceutical Operations & Field Force Overview";
+  if (isZSM && currentUser?.zone) {
+    dashboardSubtitle = `${currentUser.zone} Zone Operations & Field Force Overview`;
+  } else if (isRSM) {
+    dashboardSubtitle = `${currentUser?.territory ? `${currentUser.territory} Region` : 'Regional'} Operations & Field Force Overview`;
+  }
 
   const localizedText = {
     en: {
@@ -97,10 +146,10 @@ export default function AdminDashboard({
   // Get today's date string
   const todayStr = new Date().toISOString().split('T')[0];
   
-  // Collect today's check-ins with location
-  const todaysCheckIns = employees
+  // Collect today's check-ins with location for scoped team
+  const todaysCheckIns = scopedEmployees
     .map(emp => {
-      const todayLog = emp.checkInLogs.find(log => log.date === todayStr);
+      const todayLog = emp.checkInLogs?.find(log => log.date === todayStr);
       return {
         emp,
         log: todayLog
@@ -134,11 +183,12 @@ export default function AdminDashboard({
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 pb-2">
         {/* Greeting */}
         <div>
-          <p className="text-[14px] text-slate-500 font-medium">Hello, Admin</p>
+          <p className="text-[14px] text-slate-500 font-medium">Hello, {currentUser?.name || 'Admin'}</p>
           <div className="flex items-center gap-3">
             <h2 className="text-3xl sm:text-4xl font-display font-light text-slate-800 tracking-tight">{greeting}</h2>
             <GreetingIcon className={`${iconColor} w-7 h-7 sm:w-8 sm:h-8`} fill="currentColor" />
           </div>
+          <p className="text-xs text-slate-400 font-medium mt-1">{dashboardSubtitle}</p>
         </div>
 
         {/* Quick Stats Pills */}

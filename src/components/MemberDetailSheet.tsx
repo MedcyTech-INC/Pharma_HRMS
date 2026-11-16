@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  Plus, 
-  Briefcase, 
-  Building2, 
+import {
+  X,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Plus,
+  Briefcase,
+  Building2,
   Award,
   ChevronRight,
   Send
@@ -55,7 +55,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
     const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
     const record = member.attendanceRecords?.find(r => r.date === dateStr);
     const log = member.checkInLogs?.find(l => l.date === dateStr);
-    
+
     let status: 'present' | 'absent' | 'leave' | 'weekend' = 'absent';
     if (d.getDay() === 0) {
       status = 'weekend';
@@ -78,7 +78,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskDescription.trim() || !onCreateTask) return;
-    
+
     try {
       setIsSubmitting(true);
       await onCreateTask({
@@ -120,14 +120,14 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
       {/* Apple-style translucent backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/35 backdrop-blur-[4px] transition-opacity duration-300"
         onClick={onClose}
       />
 
       {/* Slide-over Sheet Panel */}
       <div className="relative w-full max-w-lg bg-[#F2F2F7] shadow-2xl flex flex-col h-full z-10 overflow-hidden sm:rounded-l-[28px] border-l border-[#E5E5EA]">
-        
+
         {/* Header Bar */}
         <div className="bg-white/90 backdrop-blur-md px-6 py-4 border-b border-[#E5E5EA] flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-2">
@@ -144,17 +144,16 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
 
         {/* Scrollable Sheet Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          
+
           {/* Profile Card */}
           <div className="bg-white rounded-[24px] p-5 shadow-xs border border-[#E5E5EA] flex flex-col items-center text-center relative">
             <div className="relative mb-3">
               <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#0A84FF] to-[#64D2FF] text-white font-bold text-2xl flex items-center justify-center shadow-md">
                 {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
               </div>
-              <span 
-                className={`absolute bottom-0 right-0 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center ${
-                  member.isCheckedIn ? 'bg-[#30D158]' : 'bg-[#8E8E93]'
-                }`}
+              <span
+                className={`absolute bottom-0 right-0 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center ${member.isCheckedIn ? 'bg-[#30D158]' : 'bg-[#8E8E93]'
+                  }`}
                 title={member.isCheckedIn ? 'Checked In Today' : 'Offline'}
               >
                 {member.isCheckedIn && (
@@ -169,11 +168,10 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
-              <span className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
-                member.isCheckedIn 
-                  ? 'bg-[#30D158]/15 text-[#30D158]' 
+              <span className={`text-[11px] font-semibold px-3 py-1 rounded-full ${member.isCheckedIn
+                  ? 'bg-[#30D158]/15 text-[#30D158]'
                   : 'bg-[#8E8E93]/15 text-[#8E8E93]'
-              }`}>
+                }`}>
                 {member.isCheckedIn ? '● Active Duty' : '○ Offline'}
               </span>
 
@@ -244,26 +242,24 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
 
             <div className="grid grid-cols-7 gap-1.5 text-center">
               {last7Days.map((d, i) => (
-                <div 
+                <div
                   key={i}
-                  className={`p-2 rounded-2xl flex flex-col items-center transition-all ${
-                    d.isToday 
-                      ? 'ring-2 ring-[#0A84FF] bg-[#0A84FF]/5' 
+                  className={`p-2 rounded-2xl flex flex-col items-center transition-all ${d.isToday
+                      ? 'ring-2 ring-[#0A84FF] bg-[#0A84FF]/5'
                       : 'bg-[#F2F2F7]'
-                  }`}
+                    }`}
                 >
                   <span className="text-[10px] font-medium text-[#8E8E93] uppercase">{d.dayName}</span>
                   <span className="text-xs font-bold text-[#1C1C1E] my-1">{d.dayNum}</span>
-                  <span 
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      d.status === 'present' 
-                        ? 'bg-[#30D158]' 
-                        : d.status === 'leave' 
-                        ? 'bg-[#FF9F0A]' 
-                        : d.status === 'weekend'
-                        ? 'bg-slate-300'
-                        : 'bg-[#FF3B30]/50'
-                    }`}
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${d.status === 'present'
+                        ? 'bg-[#30D158]'
+                        : d.status === 'leave'
+                          ? 'bg-[#FF9F0A]'
+                          : d.status === 'weekend'
+                            ? 'bg-slate-300'
+                            : 'bg-[#FF3B30]/50'
+                      }`}
                     title={`${d.dateStr}: ${d.status}`}
                   />
                 </div>
@@ -297,7 +293,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
               <div className="bg-[#F2F2F7] rounded-2xl p-3 text-center">
                 <span className="text-[10px] font-semibold text-[#8E8E93] uppercase">Casual</span>
                 <p className="text-base font-bold text-[#1C1C1E] mt-0.5">
-                  {typeof member.leaveBalance?.casual === 'object' 
+                  {typeof member.leaveBalance?.casual === 'object'
                     ? ((member.leaveBalance.casual?.allowed ?? 0) - (member.leaveBalance.casual?.taken ?? 0))
                     : Number(member.leaveBalance?.casual ?? 0)} <span className="text-[10px] font-normal text-[#8E8E93]">days</span>
                 </p>
@@ -355,13 +351,12 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {getPriorityBadge(task.priority)}
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          task.status === 'completed'
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${task.status === 'completed'
                             ? 'bg-[#30D158]/15 text-[#30D158]'
                             : task.status === 'incomplete'
-                            ? 'bg-[#FF3B30]/15 text-[#FF3B30]'
-                            : 'bg-[#0A84FF]/15 text-[#0A84FF]'
-                        }`}>
+                              ? 'bg-[#FF3B30]/15 text-[#FF3B30]'
+                              : 'bg-[#0A84FF]/15 text-[#0A84FF]'
+                          }`}>
                           {task.status === 'completed' ? 'Done' : task.status === 'incomplete' ? 'Overdue' : 'In Progress'}
                         </span>
                       </div>
@@ -420,7 +415,7 @@ export const MemberDetailSheet: React.FC<MemberDetailSheetProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[11px] font-semibold text-[#8E8E93] uppercase mb-1">
                       Priority

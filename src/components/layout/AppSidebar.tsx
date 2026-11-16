@@ -14,7 +14,8 @@ import {
   Menu,
   GitBranch,
   Clock,
-  UserCheck
+  UserCheck,
+  CalendarCheck
 } from 'lucide-react';
 import { Employee, isExemptAdmin } from '../../types';
 
@@ -34,7 +35,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 }) => {
   const level = currentUser.hierarchyLevel || 'be';
   const isCorporateAdmin = isExemptAdmin(currentUser);
-  const isExecutive = level === 'executive' || isCorporateAdmin;
+  const isRoleAdmin = currentUser.role === 'admin' || level === 'admin';
+  const isExecutive = level === 'executive' || isCorporateAdmin || isRoleAdmin;
   const isZSM = level === 'zsm';
   const isRSM = level === 'rsm' || level === 'team_lead' || level === 'manager';
   const isManagerOrZSM = isZSM || isRSM;
@@ -153,8 +155,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           </button>
 
           {/* Leaves */}
-          <button onClick={() => onSelectTab(isAdmin ? 'leaveApprovals' : 'leave')} className={getBtnClass(isAdmin ? 'leaveApprovals' : 'leave')}>
-            <div className={getIconClass(isAdmin ? 'leaveApprovals' : 'leave')}>
+          <button onClick={() => onSelectTab('leave')} className={getBtnClass('leave')}>
+            <div className={getIconClass('leave')}>
               <Moon size={22} />
             </div>
             <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
@@ -194,15 +196,29 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             </span>
           </button>
 
-          {/* Team Hub */}
-          <button onClick={() => onSelectTab('teamHub')} className={getBtnClass('teamHub')}>
-            <div className={getIconClass('teamHub')}>
-              <UserCheck size={22} />
-            </div>
-            <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
-              Team Hub
-            </span>
-          </button>
+          {/* Team Hub (Leadership only) */}
+          {isAdmin && (
+            <button onClick={() => onSelectTab('teamHub')} className={getBtnClass('teamHub')}>
+              <div className={getIconClass('teamHub')}>
+                <UserCheck size={22} />
+              </div>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                Team Hub
+              </span>
+            </button>
+          )}
+
+          {/* Leave Approvals (Leadership only) */}
+          {isAdmin && (
+            <button onClick={() => onSelectTab('leaveApprovals')} className={getBtnClass('leaveApprovals')}>
+              <div className={getIconClass('leaveApprovals')}>
+                <CalendarCheck size={22} />
+              </div>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                Leave Approvals
+              </span>
+            </button>
+          )}
 
           {/* Assignments */}
           <button onClick={() => onSelectTab(isAdmin ? 'adminTasks' : 'tasks')} className={getBtnClass(isAdmin ? 'adminTasks' : 'tasks')}>
@@ -246,8 +262,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             </button>
           )}
 
-          {/* Field Register (Role specific) */}
-          {isExecutive && (
+          {/* Field Register */}
+          {isAdmin && (
             <button onClick={() => onSelectTab('fieldOps')} className={getBtnClass('fieldOps')}>
               <div className={getIconClass('fieldOps')}>
                 <MapPin size={22} />
@@ -258,8 +274,20 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             </button>
           )}
 
-          {/* Settings (Role specific) */}
-          {isExecutive && (
+          {/* Office Locations */}
+          {isAdmin && (
+            <button onClick={() => onSelectTab('officeLocations')} className={getBtnClass('officeLocations')}>
+              <div className={getIconClass('officeLocations')}>
+                <MapPin size={22} />
+              </div>
+              <span className="ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[13px]">
+                Office Locations
+              </span>
+            </button>
+          )}
+
+          {/* Settings */}
+          {isAdmin && (
             <button onClick={() => onSelectTab('adminSettings')} className={getBtnClass('adminSettings')}>
               <div className={getIconClass('adminSettings')}>
                 <Settings size={22} />

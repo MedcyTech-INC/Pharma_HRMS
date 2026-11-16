@@ -16,7 +16,7 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
   if (!emps || emps.length === 0) return [];
 
   const currentMonth = new Date().toISOString().substring(0, 7);
-  
+
   // Boundary filter: strictly reject any legacy Medcy/Vizag IVF hospital IDs or excluded personnel
   const pharmaEmps = emps.filter(e => {
     const id = (e.id || '').toUpperCase();
@@ -74,7 +74,7 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     // Map leave balances
     const empBalances = balancesList.filter(b => b.employee_id === emp.id);
     const leaveBalance: LeaveBalance = {
-      sick: { allowed: 6, taken: 0 },
+      sick: { allowed: 4, taken: 0 },
       casual: { allowed: emp.cl_balance !== undefined && emp.cl_balance !== null ? Number(emp.cl_balance) : 12, taken: 0 }
     };
     if (emp.gender === 'female') {
@@ -85,7 +85,9 @@ export async function fetchAllEmployeesData(): Promise<Employee[]> {
     empBalances.forEach(b => {
       const type = b.leave_type as LeaveType;
       if (leaveBalance[type]) {
-        leaveBalance[type] = { allowed: b.total_allotted, taken: b.used };
+        // Enforce maximum 4 days policy for sick leaves (12 Casual + 4 Sick = 16 total leaves)
+        const allotted = type === 'sick' ? Math.min(Number(b.total_allotted), 4) : Number(b.total_allotted);
+        leaveBalance[type] = { allowed: allotted, taken: Number(b.used) };
       }
     });
 
@@ -351,11 +353,11 @@ export function filterEmployeesByScope(
   if (currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin' || currentUser.hierarchyLevel === 'executive') {
     return allEmployees;
   }
-  
+
   // ZSM (Zonal Sales Manager): Visibility across their entire zone (AP or TS)
   if (currentUser.hierarchyLevel === 'zsm') {
-    return allEmployees.filter(emp => 
-      emp.zone === currentUser.zone || 
+    return allEmployees.filter(emp =>
+      emp.zone === currentUser.zone ||
       emp.branch === currentUser.branch ||
       emp.reportingTo === currentUser.id ||
       emp.id === currentUser.id ||
@@ -363,16 +365,21 @@ export function filterEmployeesByScope(
       emp.hierarchyLevel === 'executive'
     );
   }
-  
+
   // RSM (Regional Sales Manager): Visibility over their direct reporting BEs
   if (currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'manager') {
-    return allEmployees.filter(emp => 
-      emp.reportingTo === currentUser.id || 
-      emp.id === currentUser.id ||
-      emp.hierarchyLevel === 'admin' ||
-      emp.hierarchyLevel === 'executive' ||
-      emp.hierarchyLevel === 'zsm'
-    );
+    const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return allEmployees.filter(emp => {
+      if (emp.id === currentUser.id) return true;
+      if (emp.hierarchyLevel === 'admin' || emp.hierarchyLevel === 'executive' || emp.hierarchyLevel === 'zsm') return true;
+      if (!emp.reportingTo) {
+        return (emp.hierarchyLevel === 'be' || emp.role === 'employee') && (emp.zone === currentUser.zone || emp.branch === currentUser.branch);
+      }
+      const rep = emp.reportingTo.trim();
+      if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+      const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+    });
   }
 
   // Business Executive (BE) tier: Personal record
@@ -463,10 +470,10 @@ export async function bulkCreateEmployees(employees: Partial<Employee>[]): Promi
     throw error;
   }
 
-  // Generate leave balances
+  // Generate leave balances (Orca Labs: 12 Casual + 4 Sick = 16 Total)
   const initialBalances: any[] = [];
   employees.forEach(emp => {
-    initialBalances.push({ employee_id: emp.id, leave_type: 'sick', total_allotted: 6, used: 0 });
+    initialBalances.push({ employee_id: emp.id, leave_type: 'sick', total_allotted: 4, used: 0 });
     initialBalances.push({ employee_id: emp.id, leave_type: 'casual', total_allotted: 12, used: 0 });
     if (emp.gender === 'female') {
       initialBalances.push({ employee_id: emp.id, leave_type: 'maternity', total_allotted: 90, used: 0 });

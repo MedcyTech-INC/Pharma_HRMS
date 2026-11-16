@@ -97,8 +97,15 @@ export const translations: Record<Language, Record<string, string>> = {
     leaveLeftOf: "left of",
     leaveSick: "Sick Leave (Medical)",
     leaveCasual: "Casual Leave (Personal)",
+    leaveEarned: "Privilege / Earned Leave (PL)",
+    leaveEmergency: "Emergency Leave",
     leaveMaternity: "Maternity Leave",
     leavePaternity: "Paternity Leave",
+    leaveMonthly: "Monthly Leave Quota",
+    leaveOther: "Other Leave",
+    otherReasonLabel: "Specify Reason for Other Leave",
+    otherReasonPlaceholder: "Please enter the specific reason for requesting other leave...",
+    otherReasonRequired: "Please specify the exact reason for Other Leave.",
 
     // Payroll
     payrollTitle: "Monthly Salary Slips",
@@ -353,8 +360,15 @@ export const translations: Record<Language, Record<string, string>> = {
     leaveLeftOf: "మిగిలి ఉన్నాయి, మొత్తం కోటా",
     leaveSick: "అనారోగ్య సెలవు (Sick Leave)",
     leaveCasual: "వ్యక్తిగత సెలవు (Casual Leave)",
-    leaveMaternity: "ప్రసూతి సెలవు",
-    leavePaternity: "పితృత్వ సెలవు",
+    leaveEarned: "సంపాదిత సెలవు (Earned Leave / PL)",
+    leaveEmergency: "అత్యవసర సెలవు (Emergency Leave)",
+    leaveMaternity: "ప్రసూతి సెలవు (Maternity Leave)",
+    leavePaternity: "పితృత్వ సెలవు (Paternity Leave)",
+    leaveMonthly: "నెలవారీ సెలవు కోటా (Monthly Quota)",
+    leaveOther: "ఇతర సెలవు (Other Leave)",
+    otherReasonLabel: "ఇతర సెలవుకు గల కారణాన్ని స్పష్టంగా తెలపండి",
+    otherReasonPlaceholder: "దయచేసి ఈ సెలవు అభ్యర్థించడానికి గల ఖచ్చితమైన కారణాన్ని నమోదు చేయండి...",
+    otherReasonRequired: "దయచేసి ఇతర సెలవు కోసం మీ కారణాన్ని స్పష్టంగా తెలపండి.",
 
     // Payroll
     payrollTitle: "మీ నెలవారీ జీతం వివరాల రశీదు (Salary Slips)",

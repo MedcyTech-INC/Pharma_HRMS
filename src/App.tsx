@@ -53,6 +53,7 @@ export default function App() {
       'admin-dashboard': 'adminDashboard',
       'directory': 'directory',
       'attendance-overview': 'attendanceOverview',
+      'team-attendance': 'attendanceOverview',
       'leave-approvals': 'leaveApprovals',
       'office-locations': 'officeLocations',
       'messages': 'messages',
@@ -61,20 +62,22 @@ export default function App() {
       'call-capture': 'callCapture',
       'field-ops': 'fieldOps',
       'tasks': 'tasks',
-      'admin-tasks': 'adminTasks'
+      'admin-tasks': 'adminTasks',
+      'team-hub': 'teamHub',
+      'doctor-planner': 'doctorPlanner'
     };
-    
+
     if (pathToTab[path]) return pathToTab[path];
     return localStorage.getItem('pharma_active_tab') || 'dashboard';
   });
-  
+
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Sync activeTab to LocalStorage and URL
   useEffect(() => {
     localStorage.setItem('pharma_active_tab', activeTab);
-    
+
     const tabToPath: Record<string, string> = {
       'executiveOverview': 'executive-overview',
       'orgChart': 'org-chart',
@@ -93,9 +96,10 @@ export default function App() {
       'fieldOps': 'field-ops',
       'tasks': 'tasks',
       'adminTasks': 'admin-tasks',
-      'teamHub': 'team-hub'
+      'teamHub': 'team-hub',
+      'doctorPlanner': 'doctor-planner'
     };
-    
+
     const newPath = '/' + (tabToPath[activeTab] || activeTab);
     if (window.location.pathname !== newPath) {
       window.history.pushState(null, '', newPath);
@@ -115,6 +119,7 @@ export default function App() {
         'admin-dashboard': 'adminDashboard',
         'directory': 'directory',
         'team-attendance': 'attendanceOverview',
+        'attendance-overview': 'attendanceOverview',
         'leave-approvals': 'leaveApprovals',
         'office-locations': 'officeLocations',
         'messages': 'messages',
@@ -124,14 +129,15 @@ export default function App() {
         'field-ops': 'fieldOps',
         'tasks': 'tasks',
         'admin-tasks': 'adminTasks',
-        'team-hub': 'teamHub'
+        'team-hub': 'teamHub',
+        'doctor-planner': 'doctorPlanner'
       };
-      
+
       if (pathToTab[path]) {
         setActiveTab(pathToTab[path]);
       }
     };
-    
+
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
@@ -139,7 +145,7 @@ export default function App() {
   // --- Domain Hooks ---
   const { employees, isLoading, error, isLocalMode, loadData, addEmployee, updateEmployee, deleteEmployee, changePassword } = useEmployees();
   const { currentUser, currentUserId, login, logout } = useAuth(employees);
-  
+
   const { applyLeave, approveLeave, rejectLeave, updateBalances } = useLeaves(isLocalMode, loadData);
   const { toggleCheckIn, updateAttendance, forceCloseSession } = useAttendance(isLocalMode, loadData);
   const { addPin } = useLocationPins(currentUser?.id, isLocalMode);
@@ -155,24 +161,28 @@ export default function App() {
   // --- Auto Route On Role Change ---
   useEffect(() => {
     if (!currentUser) return;
-    
+
+    const level = currentUser.hierarchyLevel || 'be';
     const isCorporateAdmin = isExemptAdmin(currentUser);
-    const isExecutive = currentUser.hierarchyLevel === 'executive';
-    const isManager = currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'rsm';
-    const isAdminLevel = isCorporateAdmin || isExecutive || isManager;
+    const isRoleAdmin = currentUser.role === 'admin' || level === 'admin';
+    const isExecutive = level === 'executive' || isCorporateAdmin || isRoleAdmin;
+    const isZSM = level === 'zsm';
+    const isRSM = level === 'rsm' || level === 'team_lead' || level === 'manager';
+    const isManagerOrZSM = isZSM || isRSM;
+    const isAdminLevel = isExecutive || isManagerOrZSM;
 
     const adminTabs = [
       'dashboard', 'adminDashboard', 'directory', 'attendanceOverview', 'leaveApprovals',
       'officeLocations', 'messages', 'adminSettings', 'fieldOps', 'adminTasks',
       'executiveOverview', 'orgChart', 'doctorPlanner', 'fieldDuty', 'callCapture', 'attendance', 'leave',
-      'teamHub'
+      'teamHub', 'tasks'
     ];
     const employeeTabs = [
-      'dashboard', 'attendance', 'leave', 'messages', 'fieldDuty', 'callCapture', 'tasks', 'doctorPlanner'
+      'dashboard', 'attendance', 'leave', 'messages', 'fieldDuty', 'callCapture', 'tasks', 'doctorPlanner', 'directory', 'orgChart'
     ];
 
     if (isAdminLevel && !adminTabs.includes(activeTab)) {
-      setActiveTab(isExecutive ? 'executiveOverview' : 'adminDashboard');
+      setActiveTab('adminDashboard');
     } else if (!isAdminLevel && !employeeTabs.includes(activeTab)) {
       setActiveTab('dashboard');
     }
@@ -207,7 +217,7 @@ export default function App() {
               We couldn't connect or fetch tables. Ensure your Supabase project is active and schemas have been executed.
             </p>
           </div>
-          
+
           <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl text-left space-y-2">
             <span className="text-[9px] font-bold uppercase tracking-wider text-teal-600">Quick Setup:</span>
             <ol className="text-[10px] text-slate-500 space-y-1 list-decimal list-inside leading-normal font-medium">
@@ -218,8 +228,8 @@ export default function App() {
           </div>
 
           <div className="pt-2">
-            <button 
-              onClick={loadData} 
+            <button
+              onClick={loadData}
               className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 active:scale-98 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md shadow-teal-600/10 cursor-pointer transition-all"
             >
               Retry Connection
@@ -239,12 +249,16 @@ export default function App() {
         <LoginScreen
           employees={employees}
           onLoginSuccess={(emp) => {
-            login(emp.id, emp);
-            if (emp.hierarchyLevel === 'executive') {
-              setActiveTab('executiveOverview');
-            } else if (isExemptAdmin(emp)) {
+            login(emp.id);
+            const level = emp.hierarchyLevel || 'be';
+            const isCorpAdmin = isExemptAdmin(emp);
+            const isRoleAdmin = emp.role === 'admin' || level === 'admin';
+            const isExec = level === 'executive' || isCorpAdmin || isRoleAdmin;
+            const isMgr = level === 'zsm' || level === 'rsm' || level === 'manager';
+
+            if (isExec) {
               setActiveTab('adminDashboard');
-            } else if (emp.hierarchyLevel === 'zsm' || emp.hierarchyLevel === 'rsm') {
+            } else if (isMgr) {
               setActiveTab(emp.isCheckedIn ? 'adminDashboard' : 'dashboard');
             } else {
               setActiveTab('dashboard');
@@ -260,55 +274,59 @@ export default function App() {
 
   return (
     <div id="app-root-shell" className="h-screen overflow-hidden bg-[#f8fafc] flex flex-col font-sans antialiased text-slate-900">
-        <OfflineIndicator />
-        <PwaInstallPrompt />
-        <NotificationProvider currentUser={currentUser} />
-        
-        {/* 1. Header Navigation Bar */}
-        <AppHeader
+      <OfflineIndicator />
+      <PwaInstallPrompt />
+      <NotificationProvider currentUser={currentUser} />
+
+      {/* 1. Header Navigation Bar */}
+      <AppHeader
+        currentUser={currentUser}
+        onOpenProfile={() => setShowProfileModal(true)}
+        onLogout={handleLogout}
+        onLogoClick={() => {
+          const level = currentUser.hierarchyLevel || 'be';
+          const isCorpAdmin = isExemptAdmin(currentUser);
+          const isRoleAdmin = currentUser.role === 'admin' || level === 'admin';
+          const isExec = level === 'executive' || isCorpAdmin || isRoleAdmin;
+          const isMgr = level === 'zsm' || level === 'rsm' || level === 'manager';
+          setActiveTab(isExec || isMgr ? 'adminDashboard' : 'dashboard');
+        }}
+        onOpenMenu={() => setMobileNavOpen(true)}
+      />
+
+      {/* User Profile View / Edit Modal */}
+      {showProfileModal && (
+        <UserProfileModal
+          language={language}
           currentUser={currentUser}
+          onClose={() => setShowProfileModal(false)}
+          onUpdatePassword={async (newPassword) => {
+            await changePassword(currentUser.id, newPassword);
+          }}
+        />
+      )}
+
+      {/* 2. Body Grid / Sidebar Layout */}
+      <div id="portal-body-wrapper" className="flex-1 w-full flex overflow-hidden">
+
+        {/* Desktop Sidebar Navigation */}
+        <AppSidebar
+          currentUser={currentUser}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
           onOpenProfile={() => setShowProfileModal(true)}
           onLogout={handleLogout}
-          onLogoClick={() => setActiveTab(
-            currentUser.hierarchyLevel === 'executive' 
-              ? 'executiveOverview' 
-              : ((isExemptAdmin(currentUser) || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'zsm' || currentUser.hierarchyLevel === 'rsm') ? 'adminDashboard' : 'dashboard')
-          )}
-          onOpenMenu={() => setMobileNavOpen(true)}
         />
 
-        {/* User Profile View / Edit Modal */}
-        {showProfileModal && (
-          <UserProfileModal
-            language={language}
-            currentUser={currentUser}
-            onClose={() => setShowProfileModal(false)}
-            onUpdatePassword={async (newPassword) => {
-              await changePassword(currentUser.id, newPassword);
-            }}
-          />
-        )}
-
-        {/* 2. Body Grid / Sidebar Layout */}
-        <div id="portal-body-wrapper" className="flex-1 w-full flex overflow-hidden">
-          
-          {/* Desktop Sidebar Navigation */}
-          <AppSidebar
-            currentUser={currentUser}
-            activeTab={activeTab}
-            onSelectTab={setActiveTab}
-            onOpenProfile={() => setShowProfileModal(true)}
-            onLogout={handleLogout}
-          />
-
-          {/* Primary Content Router */}
+        {/* Primary Content Router */}
         <main id="portal-primary-content" className={`flex-1 ${activeTab === 'orgChart' ? 'overflow-hidden p-2 sm:p-3' : 'overflow-y-auto px-4 sm:px-6 py-6 md:py-8 pb-24 lg:pb-8'} min-w-0 print:col-span-12 print:overflow-visible print:p-0 print:m-0`}>
-            <React.Suspense fallback={
-              <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
-                <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading Module...</p>
-              </div>
-            }>
+          <React.Suspense fallback={
+            <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4 animate-fadeIn">
+              <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading Module...</p>
+            </div>
+          }>
+            <div key={activeTab} className="animate-moduleEnter w-full min-h-full">
               <AppRouter
                 activeTab={activeTab}
                 language={language}
@@ -346,30 +364,31 @@ export default function App() {
                 holidayEve={holidayEve}
                 holidaysLoading={holidaysLoading}
               />
-            </React.Suspense>
-          </main>
-
-        </div>
-
-        {/* 3. Mobile Slide-in Drawer Navigation */}
-        <MobileDrawerNav
-          isOpen={mobileNavOpen}
-          onClose={() => setMobileNavOpen(false)}
-          currentUser={currentUser}
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          onOpenProfile={() => setShowProfileModal(true)}
-        />
-
-        {/* 4. Mobile Bottom Navigation Bar */}
-        <MobileBottomNav
-          currentUser={currentUser}
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          onOpenMenu={() => setMobileNavOpen(true)}
-          onLogout={handleLogout}
-        />
+            </div>
+          </React.Suspense>
+        </main>
 
       </div>
+
+      {/* 3. Mobile Slide-in Drawer Navigation */}
+      <MobileDrawerNav
+        isOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        currentUser={currentUser}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onOpenProfile={() => setShowProfileModal(true)}
+      />
+
+      {/* 4. Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentUser={currentUser}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onOpenMenu={() => setMobileNavOpen(true)}
+        onLogout={handleLogout}
+      />
+
+    </div>
   );
 }

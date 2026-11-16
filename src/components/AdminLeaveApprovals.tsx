@@ -9,6 +9,7 @@ interface AdminLeaveApprovalsProps {
  employees: Employee[];
  onApproveLeave: (empId: string, reqId: string, approverId: string, note?: string) => void;
  onRejectLeave: (empId: string, reqId: string, approverId: string, note?: string) => void;
+ setActiveTab?: (tab: string) => void;
 }
 
 export default function AdminLeaveApprovals({
@@ -17,6 +18,7 @@ export default function AdminLeaveApprovals({
  employees,
  onApproveLeave,
  onRejectLeave,
+ setActiveTab,
 }: AdminLeaveApprovalsProps) {
  const t = translations[language];
 
@@ -24,17 +26,28 @@ export default function AdminLeaveApprovals({
  const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
  const [leaveBranchFilter, setLeaveBranchFilter] = useState<Branch | 'all'>('all');
 
- // Determine scoped employees based on current user's hierarchy
+ // Determine scoped employees based on current user's hierarchy in Pharma HRMS
  let scopedEmployees = employees;
- if (currentUser.hierarchyLevel === 'team_lead') {
-   scopedEmployees = employees.filter(emp => emp.reportingTo === currentUser.id);
- } else if (currentUser.hierarchyLevel === 'senior_manager') {
-   scopedEmployees = employees.filter(emp => emp.hospital === currentUser.hospital);
- } else if (currentUser.hierarchyLevel === 'manager') {
-    const branches = currentUser.managedBranches && currentUser.managedBranches.length > 0
-      ? currentUser.managedBranches
-      : (currentUser.branch ? [currentUser.branch] : ['visakhapatnam', 'vizianagaram']);
-    scopedEmployees = employees.filter(emp => emp.hospital === currentUser.hospital && branches.includes(emp.branch || 'visakhapatnam'));
+ if (currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'team_lead') {
+   const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+   scopedEmployees = employees.filter(emp => {
+     if (emp.id === currentUser.id) return false;
+     if (!emp.reportingTo) {
+       return (emp.hierarchyLevel === 'be' || emp.role === 'employee') && (emp.zone === currentUser.zone || emp.branch === currentUser.branch);
+     }
+     const rep = emp.reportingTo.trim();
+     if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+     const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+     return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+   });
+ } else if (currentUser.hierarchyLevel === 'zsm') {
+   scopedEmployees = employees.filter(emp => 
+     emp.id !== currentUser.id && 
+     (emp.zone === currentUser.zone || emp.branch === currentUser.branch || emp.reportingTo === currentUser.id)
+   );
+ } else {
+   // Admin / Executive: view all other staff leaves
+   scopedEmployees = employees.filter(emp => emp.id !== currentUser.id);
  }
 
  // Compile leave requests across scoped employees, filtered by selected branch
@@ -42,11 +55,12 @@ export default function AdminLeaveApprovals({
  const processedRequests: { emp: Employee; req: LeaveRequest }[] = [];
 
  scopedEmployees.forEach(emp => {
-  if (leaveBranchFilter !== 'all' && (emp.branch || 'visakhapatnam') !== leaveBranchFilter) {
+  const empBranch = emp.branch || (emp.zone === 'TS' ? 'ts_zone' : emp.zone === 'Corporate' ? 'corporate' : 'ap_zone');
+  if (leaveBranchFilter !== 'all' && empBranch !== leaveBranchFilter) {
    return;
   }
-  emp.leaveRequests.forEach(req => {
-   if (req.status === 'pending') {
+  emp.leaveRequests?.forEach(req => {
+   if (req.status?.toLowerCase() === 'pending') {
     pendingRequests.push({ emp, req });
    } else {
     processedRequests.push({ emp, req });
@@ -108,6 +122,28 @@ export default function AdminLeaveApprovals({
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
  };
 
+ const getLeaveTypeDisplay = (type: string) => {
+  switch (type?.toLowerCase()) {
+   case 'casual': return 'Casual Leave (CL)';
+   case 'sick': return 'Sick / Medical Leave (SL)';
+   case 'monthly': return 'Monthly Quota';
+   case 'earned': return 'Earned / Privilege (PL)';
+   case 'emergency': return 'Emergency Leave';
+   case 'maternity': return 'Maternity Leave';
+   case 'paternity': return 'Paternity Leave';
+   case 'other': return 'Other Leave';
+   default: return `${type || 'Leave'}`;
+  }
+ };
+
+ const casualRemaining = typeof currentUser.leaveBalance?.casual === 'object'
+  ? ((currentUser.leaveBalance.casual?.allowed ?? 12) - (currentUser.leaveBalance.casual?.taken ?? 0))
+  : (currentUser.leaveBalance?.casual ?? 12);
+
+ const sickRemaining = typeof currentUser.leaveBalance?.sick === 'object'
+  ? ((currentUser.leaveBalance.sick?.allowed ?? 4) - (currentUser.leaveBalance.sick?.taken ?? 0))
+  : (currentUser.leaveBalance?.sick ?? 4);
+
  return (
   <div id="admin-leaves-container"className="space-y-8 animate-fadeIn">
    
@@ -122,7 +158,19 @@ export default function AdminLeaveApprovals({
      </p>
     </div>
 
-    <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
+     <div className="flex items-center gap-3 flex-wrap">
+      {setActiveTab && (
+       <button
+        onClick={() => setActiveTab('leave')}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100/80 text-teal-700 border border-teal-200 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+        title="Apply for personal casual or sick leave"
+       >
+        <Moon className="w-3.5 h-3.5" />
+        <span>My Personal Leave ({casualRemaining} CL / {sickRemaining} SL)</span>
+       </button>
+      )}
+
+      <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
      <button
       onClick={() => setLeaveBranchFilter('all')}
       className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -131,30 +179,41 @@ export default function AdminLeaveApprovals({
         : 'text-slate-500 hover:text-slate-800'
       }`}
      >
-      All Branches
+      All Territories
      </button>
      <button
-      onClick={() => setLeaveBranchFilter('visakhapatnam')}
+      onClick={() => setLeaveBranchFilter('ap_zone')}
       className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-       leaveBranchFilter === 'visakhapatnam'
+       leaveBranchFilter === 'ap_zone'
+        ? 'bg-white text-emerald-700 shadow-sm'
+        : 'text-slate-500 hover:text-slate-800'
+      }`}
+     >
+      AP Zone
+     </button>
+     <button
+      onClick={() => setLeaveBranchFilter('ts_zone')}
+      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+       leaveBranchFilter === 'ts_zone'
+        ? 'bg-white text-cyan-700 shadow-sm'
+        : 'text-slate-500 hover:text-slate-800'
+      }`}
+     >
+      TS Zone
+     </button>
+     <button
+      onClick={() => setLeaveBranchFilter('corporate')}
+      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+       leaveBranchFilter === 'corporate'
         ? 'bg-white text-teal-700 shadow-sm'
         : 'text-slate-500 hover:text-slate-800'
       }`}
      >
-      Visakhapatnam
-     </button>
-     <button
-      onClick={() => setLeaveBranchFilter('vizianagaram')}
-      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-       leaveBranchFilter === 'vizianagaram'
-        ? 'bg-white text-indigo-700 shadow-sm'
-        : 'text-slate-500 hover:text-slate-800'
-      }`}
-     >
-      Vizianagaram
+      Corporate
      </button>
     </div>
    </div>
+  </div>
 
    {/* 2. Pending Requests Grid list */}
    <div className="bg-white rounded-[32px] p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
@@ -177,7 +236,13 @@ export default function AdminLeaveApprovals({
       {pendingRequests.map(({ emp, req }) => {
        const daysCount = calculateDays(req.fromDate, req.toDate);
        const noteText = decisionNotes[req.id] || '';
-       const empBranch = emp.branch || 'visakhapatnam';
+       const empBranch = emp.branch || (emp.zone === 'TS' ? 'ts_zone' : emp.zone === 'Corporate' ? 'corporate' : 'ap_zone');
+       const zoneLabel = emp.zone === 'TS' || empBranch === 'ts_zone' ? 'TS Zone' : emp.zone === 'Corporate' || empBranch === 'corporate' ? 'Corporate' : 'AP Zone';
+       const zoneCls = emp.zone === 'TS' || empBranch === 'ts_zone'
+        ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+        : emp.zone === 'Corporate' || empBranch === 'corporate'
+          ? 'bg-teal-50 text-teal-700 border border-teal-200'
+          : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
 
        return (
         <div 
@@ -194,10 +259,8 @@ export default function AdminLeaveApprovals({
            <div>
             <div className="flex items-center gap-2">
              <h4 className="text-xs font-bold text-slate-800">{emp.name}</h4>
-             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-              empBranch === 'visakhapatnam' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-             }`}>
-              {empBranch === 'visakhapatnam' ? 'Vizag' : 'Vizianagaram'}
+             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${zoneCls}`}>
+              {zoneLabel}
              </span>
             </div>
             <p className="text-[10px] text-slate-400">
@@ -222,7 +285,7 @@ export default function AdminLeaveApprovals({
            <div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{localizedText.colType}</p>
             <p className="font-bold text-teal-700 mt-1 uppercase">
-             {req.type} LEAVE
+             {getLeaveTypeDisplay(req.type)}
             </p>
            </div>
           </div>
@@ -308,7 +371,7 @@ export default function AdminLeaveApprovals({
             <span className="text-[10px] text-slate-400">({emp.id})</span>
            </div>
           </td>
-          <td className="p-4 text-xs font-semibold uppercase text-teal-700">{req.type}</td>
+          <td className="p-4 text-xs font-semibold text-teal-700">{getLeaveTypeDisplay(req.type)}</td>
           <td className="p-4 text-xs text-slate-600 font-medium">
            {req.fromDate} to {req.toDate}
           </td>
@@ -325,17 +388,17 @@ export default function AdminLeaveApprovals({
              {req.approvedBy && (
                <span className="text-[9px] text-slate-400">By {employees.find(e => e.id === req.approvedBy)?.name || req.approvedBy}</span>
              )}
-             {currentUser.hierarchyLevel === 'senior_manager' && (
+             {(currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin' || currentUser.hierarchyLevel === 'executive') && (
                 <div className="flex gap-2 mt-2">
                   {req.status !== 'approved' && (
                      <button
-                        onClick={() => onApproveLeave(emp.id, req.id, currentUser.id, 'Overridden by Senior Manager')}
+                        onClick={() => onApproveLeave(emp.id, req.id, currentUser.id, 'Overridden by Administrator')}
                         className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer uppercase underline"
                      >Override & Approve</button>
                   )}
                   {req.status !== 'rejected' && (
                      <button
-                        onClick={() => onRejectLeave(emp.id, req.id, currentUser.id, 'Overridden by Senior Manager')}
+                        onClick={() => onRejectLeave(emp.id, req.id, currentUser.id, 'Overridden by Administrator')}
                         className="text-[9px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer uppercase underline"
                      >Override & Reject</button>
                   )}

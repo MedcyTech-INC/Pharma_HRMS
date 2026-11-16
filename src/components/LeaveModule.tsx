@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
 import { CalendarDays, Send, ShieldAlert, CheckCircle, XCircle, Clock, ToggleLeft, ToggleRight, UserCheck } from 'lucide-react';
-import { Language, LeaveType, LeaveRequest, LeaveBalance, MonthlyLeaveQuota } from '../types';
+import { Language, LeaveType, LeaveRequest, LeaveBalance, MonthlyLeaveQuota, Employee } from '../types';
 import { translations } from '../translations';
 
 interface LeaveModuleProps {
+ currentUser?: Employee;
+ canManageLeaves?: boolean;
  language: Language;
  leaveBalance: LeaveBalance;
  monthlyQuota: MonthlyLeaveQuota;
  leaveRequests: LeaveRequest[];
  gender?: 'male' | 'female' | 'other';
  onApplyLeave: (type: LeaveType, fromDate: string, toDate: string, reason: string) => Promise<void>;
- onApproveLeave: (id: string) => void;
- onRejectLeave: (id: string) => void;
+ onApproveLeave?: (id: string) => void;
+ onRejectLeave?: (id: string) => void;
  onUpdateBalances?: (type: LeaveType, allotted: number, used: number) => void;
 }
 
 export default function LeaveModule({
+ currentUser,
+ canManageLeaves,
  language,
  leaveBalance,
  monthlyQuota,
@@ -28,16 +32,53 @@ export default function LeaveModule({
 }: LeaveModuleProps) {
  const t = translations[language];
 
+ // Determine if the user is authorized for Manager Mode
+ // Business Executives (BE / Field Representatives) must NEVER have Manager Mode
+ const isBE = currentUser?.hierarchyLevel === 'be' || (!currentUser?.hierarchyLevel && currentUser?.role !== 'admin');
+ const isManagerOrAdmin = currentUser 
+  ? (currentUser.role === 'admin' || ['admin', 'executive', 'zsm', 'rsm', 'manager'].includes(currentUser.hierarchyLevel || ''))
+  : false;
+
+ const showManagerToggle = canManageLeaves !== undefined 
+  ? (canManageLeaves && !isBE) 
+  : (Boolean(currentUser) ? isManagerOrAdmin && !isBE : false);
+
  // Local Form state
  const [leaveType, setLeaveType] = useState<LeaveType>('monthly');
  const [fromDate, setFromDate] = useState('');
  const [toDate, setToDate] = useState('');
  const [reason, setReason] = useState('');
+ const [otherReason, setOtherReason] = useState('');
  const [errorMsg, setErrorMsg] = useState('');
  const [successMsg, setSuccessMsg] = useState('');
 
- // Manager Mode state
+ // Format human-readable leave type name across all supported types
+ const formatLeaveTypeName = (type: string) => {
+  switch (type) {
+   case 'casual':
+    return t.leaveCasual || (language === 'te' ? 'సాధారణ సెలవు (CL)' : 'Casual Leave (CL)');
+   case 'sick':
+    return t.leaveSick || (language === 'te' ? 'అనారోగ్య సెలవు (SL)' : 'Sick Leave (SL)');
+   case 'monthly':
+    return t.leaveMonthly || (language === 'te' ? 'నెలవారీ సెలవు కోటా' : 'Monthly Leave Quota');
+   case 'earned':
+    return t.leaveEarned || (language === 'te' ? 'సంపాదిత సెలవు (PL)' : 'Privilege / Earned Leave (PL)');
+   case 'emergency':
+    return t.leaveEmergency || (language === 'te' ? 'అత్యవసర సెలవు' : 'Emergency Leave');
+   case 'maternity':
+    return t.leaveMaternity || (language === 'te' ? 'ప్రసూతి సెలవు' : 'Maternity Leave');
+   case 'paternity':
+    return t.leavePaternity || (language === 'te' ? 'పితృత్వ సెలవు' : 'Paternity Leave');
+   case 'other':
+    return t.leaveOther || (language === 'te' ? 'ఇతర సెలవు' : 'Other Leave');
+   default:
+    return type;
+  }
+ };
+
+ // Manager Mode state - strictly restricted to authorized managers
  const [managerMode, setManagerMode] = useState(false);
+ const activeManagerMode = showManagerToggle && managerMode;
 
  // Form submission handler
  const [showManageModal, setShowManageModal] = useState(false);
@@ -79,15 +120,28 @@ export default function LeaveModule({
    return;
   }
 
+  // Validate custom reason when Other is selected
+  if (leaveType === 'other' && !otherReason.trim()) {
+   setErrorMsg(t.otherReasonRequired || (language === 'te' ? 'దయచేసి ఇతర సెలవు కోసం మీ కారణాన్ని స్పష్టంగా తెలపండి.' : 'Please specify the exact reason for Other Leave.'));
+   return;
+  }
+
   const diffTime = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
+  const trimmedReason = reason.trim();
+  const trimmedOther = otherReason.trim();
+  const finalReason = leaveType === 'other'
+   ? (trimmedReason ? `[Other: ${trimmedOther}] ${trimmedReason}` : `[Other: ${trimmedOther}]`)
+   : (trimmedReason || 'Personal Leave');
+
   try {
-   await onApplyLeave(leaveType, fromDate, toDate, reason);
+   await onApplyLeave(leaveType, fromDate, toDate, finalReason);
    setSuccessMsg(language === 'te' ? 'సెలవు అప్లికేషన్ విజయవంతంగా సబ్మిట్ చేయబడింది!' : 'Leave application submitted successfully!');
    setFromDate('');
    setToDate('');
    setReason('');
+   setOtherReason('');
   } catch (err: any) {
    console.error(err);
    setErrorMsg(err.message || 'Failed to submit leave. Please check your connection.');
@@ -96,7 +150,7 @@ export default function LeaveModule({
 
  // Status tag styling helper
  const getStatusTag = (status: string) => {
-  switch (status) {
+  switch (status?.toLowerCase()) {
    case 'approved':
     return (
      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-100">
@@ -131,32 +185,34 @@ export default function LeaveModule({
       {t.leave}
      </h2>
      <p className="text-xs text-slate-400 mt-1">
-      {managerMode ? t.managerViewLabel :"Submit and track your formal leave applications"}
+      {activeManagerMode ? t.managerViewLabel : "Submit and track your formal leave applications"}
      </p>
     </div>
 
-    {/* Manager Mode Toggle */}
-    <div className="flex items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100">
-     <span className="w-1.5 h-1.5 bg-teal-600 rounded-full shrink-0"/>
-     <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-      {t.roleManager}
-     </span>
-     <button
-      id="manager-mode-toggle"
-      onClick={() => {
-       setManagerMode(!managerMode);
-       setSuccessMsg('');
-       setErrorMsg('');
-      }}
-      className="focus:outline-none cursor-pointer"
-     >
-      {managerMode ? (
-       <ToggleRight className="w-9 h-9 text-teal-600"/>
-      ) : (
-       <ToggleLeft className="w-9 h-9 text-slate-300"/>
-      )}
-     </button>
-    </div>
+    {/* Manager Mode Toggle - Strictly hidden for BE roles */}
+    {showManagerToggle && (
+     <div className="flex items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100">
+      <span className="w-1.5 h-1.5 bg-teal-600 rounded-full shrink-0"/>
+      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+       {t.roleManager}
+      </span>
+      <button
+       id="manager-mode-toggle"
+       onClick={() => {
+        setManagerMode(!managerMode);
+        setSuccessMsg('');
+        setErrorMsg('');
+       }}
+       className="focus:outline-none cursor-pointer"
+      >
+       {activeManagerMode ? (
+        <ToggleRight className="w-9 h-9 text-teal-600"/>
+       ) : (
+        <ToggleLeft className="w-9 h-9 text-slate-300"/>
+       )}
+      </button>
+     </div>
+    )}
    </div>
 
 
@@ -218,12 +274,40 @@ export default function LeaveModule({
     )}
     
     {/* LEFT COLUMN: Apply Leave (only visible in Employee Mode) */}
-    {!managerMode ? (
+    {!activeManagerMode ? (
      <div id="leave-form-container"className="lg:col-span-5 bg-white rounded-[32px] p-8 shadow-sm border border-slate-100">
-      <h3 className="text-base font-bold font-display text-slate-800 mb-5 flex items-center gap-2">
+      <h3 className="text-base font-bold font-display text-slate-800 mb-4 flex items-center gap-2">
        <span className="w-1.5 h-1.5 bg-teal-600 rounded-full shrink-0"/>
        {t.leaveTitle}
       </h3>
+
+      {/* Leave Balance Summary Badges */}
+      <div className="grid grid-cols-3 gap-2.5 mb-5">
+       <div className="bg-teal-50/70 border border-teal-100/90 rounded-2xl p-2.5 text-center">
+        <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wider">
+         {language === 'te' ? 'నెల కోటా' : 'Monthly'}
+        </p>
+        <p className="text-sm font-extrabold text-teal-900 mt-0.5">
+         {monthlyQuota?.remaining ?? 3} <span className="text-[10px] font-normal text-teal-700">/ {monthlyQuota?.allotted ?? 3}</span>
+        </p>
+       </div>
+       <div className="bg-emerald-50/70 border border-emerald-100/90 rounded-2xl p-2.5 text-center">
+        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+         {language === 'te' ? 'సాధారణ (CL)' : 'Casual (CL)'}
+        </p>
+        <p className="text-sm font-extrabold text-emerald-900 mt-0.5">
+         {Math.max(0, (leaveBalance?.casual?.allowed ?? 12) - (leaveBalance?.casual?.taken ?? 0))} <span className="text-[10px] font-normal text-emerald-700">/ {leaveBalance?.casual?.allowed ?? 12}</span>
+        </p>
+       </div>
+       <div className="bg-indigo-50/70 border border-indigo-100/90 rounded-2xl p-2.5 text-center">
+        <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+         {language === 'te' ? 'వైద్య (SL)' : 'Sick (SL)'}
+        </p>
+        <p className="text-sm font-extrabold text-indigo-900 mt-0.5">
+         {Math.max(0, (leaveBalance?.sick?.allowed ?? 7) - (leaveBalance?.sick?.taken ?? 0))} <span className="text-[10px] font-normal text-indigo-700">/ {leaveBalance?.sick?.allowed ?? 7}</span>
+        </p>
+       </div>
+      </div>
 
       {errorMsg && (
        <div className="mb-4 bg-rose-50 text-rose-700 p-3.5 rounded-xl border border-rose-100 text-sm font-medium">
@@ -239,7 +323,7 @@ export default function LeaveModule({
 
       <form onSubmit={handleSubmit} className="space-y-4">
        <div>
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+        <label htmlFor="leave-type-select" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
          {t.formType}
         </label>
         <select
@@ -248,15 +332,20 @@ export default function LeaveModule({
          onChange={(e) => setLeaveType(e.target.value as LeaveType)}
          className="w-full border border-slate-200 bg-slate-50 hover:bg-slate-100/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-[#0f766e] font-medium transition-all"
         >
-         <option value="monthly">{language === 'te' ? 'నెలవారీ సెలవు కోటా' : 'Monthly Leave Quota'}</option>
-         {gender === 'female' && <option value="maternity">{t.leaveMaternity || 'Maternity Leave'}</option>}
-         {gender === 'male' && <option value="paternity">{t.leavePaternity || 'Paternity Leave'}</option>}
+         <option value="casual">{t.leaveCasual || 'Casual Leave (CL)'}</option>
+         <option value="sick">{t.leaveSick || 'Sick / Medical Leave (SL)'}</option>
+         <option value="monthly">{t.leaveMonthly || (language === 'te' ? 'నెలవారీ సెలవు కోటా' : 'Monthly Leave Quota (3 Days/Mo)')}</option>
+         <option value="earned">{t.leaveEarned || 'Privilege / Earned Leave (PL)'}</option>
+         <option value="emergency">{t.leaveEmergency || 'Emergency / Urgent Leave'}</option>
+         {gender !== 'male' && <option value="maternity">{t.leaveMaternity || 'Maternity Leave'}</option>}
+         {gender !== 'female' && <option value="paternity">{t.leavePaternity || 'Paternity Leave'}</option>}
+         <option value="other">{t.leaveOther || 'Other Leave (Specify Below)'}</option>
         </select>
        </div>
 
        <div className="grid grid-cols-2 gap-4">
         <div>
-         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+         <label htmlFor="leave-from-date" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
           {t.formFrom}
          </label>
          <input
@@ -268,7 +357,7 @@ export default function LeaveModule({
          />
         </div>
         <div>
-         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+         <label htmlFor="leave-to-date" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
           {t.formTo}
          </label>
          <input
@@ -282,7 +371,7 @@ export default function LeaveModule({
        </div>
 
        <div>
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+        <label htmlFor="leave-reason-textarea" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
          {t.formReason}
         </label>
         <textarea
@@ -294,6 +383,35 @@ export default function LeaveModule({
          className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-[#0f766e] transition-all placeholder:text-slate-400"
         />
        </div>
+
+       {/* Conditional 'Other' Reason Input */}
+       {leaveType === 'other' && (
+        <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 space-y-2 animate-fadeIn">
+         <div className="flex items-center justify-between">
+          <label htmlFor="leave-other-reason-input" className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+           <span>{t.otherReasonLabel || 'Specify Reason for Other Leave'}</span>
+           <span className="text-rose-600 font-black">*</span>
+          </label>
+          <span className="text-[10px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">
+           {language === 'te' ? 'తప్పనిసరి' : 'Required'}
+          </span>
+         </div>
+         <input
+          id="leave-other-reason-input"
+          type="text"
+          required
+          value={otherReason}
+          onChange={(e) => setOtherReason(e.target.value)}
+          placeholder={t.otherReasonPlaceholder || 'Please enter the specific reason for requesting other leave...'}
+          className="w-full border border-amber-300 bg-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition-all text-slate-800 placeholder:text-slate-400 font-medium"
+         />
+         <p className="text-[11px] text-amber-700 font-medium">
+          {language === 'te'
+           ? 'ఈ నిర్దిష్ట కారణం మీ లీవ్ అప్లికేషన్‌తో కలిపి అప్రూవర్ పరిశీలనకు పంపబడుతుంది.'
+           : 'This specific reason will be clearly attached to your leave application for leadership review.'}
+         </p>
+        </div>
+       )}
 
        <button
         id="submit-leave-btn"
@@ -335,7 +453,7 @@ export default function LeaveModule({
      <div className="flex items-center gap-2 mb-6 pb-2">
       <span className="w-1.5 h-1.5 bg-teal-600 rounded-full shrink-0"/>
       <h3 className="text-lg font-bold font-display text-slate-800">
-       {managerMode ? (language === 'te' ? 'ఆమోదం కొరకు అప్లికేషన్లు' : 'Requests Requiring Action') : t.historyTitle}
+       {activeManagerMode ? (language === 'te' ? 'ఆమోదం కొరకు అప్లికేషన్లు' : 'Requests Requiring Action') : t.historyTitle}
       </h3>
      </div>
 
@@ -346,10 +464,8 @@ export default function LeaveModule({
        </div>
       ) : (
        leaveRequests.slice().reverse().map((req) => {
-        const leaveTypeName = req.type === 'monthly' 
-         ? (language === 'te' ? 'నెలవారీ సెలవు కోటా' : 'Monthly Leave Quota')
-         : (t[`leave${req.type.charAt(0).toUpperCase() + req.type.slice(1)}` as keyof typeof t] || req.type);
-        const isPending = req.status === 'pending';
+        const leaveTypeName = formatLeaveTypeName(req.type);
+        const isPending = req.status?.toLowerCase() === 'pending';
 
         return (
          <div
@@ -394,8 +510,8 @@ export default function LeaveModule({
            </p>
           </div>
 
-          {/* Approver actions for Manager Mode */}
-          {managerMode && isPending && (
+          {/* Approver actions for Manager Mode - Only available when manager mode is active and handlers provided */}
+          {activeManagerMode && isPending && onApproveLeave && onRejectLeave && (
            <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-end gap-2.5">
             <button
              id={`reject-${req.id}`}

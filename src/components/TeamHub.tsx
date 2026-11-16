@@ -1,21 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Users, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  Search, 
-  Filter, 
-  Phone, 
-  Mail, 
-  UserCheck, 
-  ArrowRight, 
-  Check, 
-  X, 
-  RefreshCw, 
-  Calendar, 
-  Briefcase, 
-  Layers, 
+import {
+  Users,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Search,
+  Filter,
+  Phone,
+  Mail,
+  UserCheck,
+  ArrowRight,
+  Check,
+  X,
+  RefreshCw,
+  Calendar,
+  Briefcase,
+  Layers,
   ChevronRight,
   UserX,
   MessageSquare,
@@ -49,11 +49,11 @@ export const TeamHub: React.FC<TeamHubProps> = ({
 }) => {
   // Main view tab: 'roster' | 'approvals'
   const [activeSegment, setActiveSegment] = useState<'roster' | 'approvals'>('roster');
-  
+
   // Search & Filters for Team Roster
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'offline' | 'on_leave'>('all');
-  
+
   // Approval Tab Filter: 'pending' | 'all' | 'approved' | 'rejected'
   const [approvalFilter, setApprovalFilter] = useState<'pending' | 'all' | 'approved' | 'rejected'>('pending');
 
@@ -69,40 +69,44 @@ export const TeamHub: React.FC<TeamHubProps> = ({
 
   // Determine Direct Reports
   const directReports = useMemo(() => {
-    const isExecOrAdmin = 
-      currentUser.hierarchyLevel === 'executive' || 
-      currentUser.hierarchyLevel === 'admin' || 
+    const isExecOrAdmin =
+      currentUser.hierarchyLevel === 'executive' ||
+      currentUser.hierarchyLevel === 'admin' ||
       currentUser.role === 'admin';
 
     if (isExecOrAdmin) {
       return employees.filter(e => e.id !== currentUser.id);
     }
 
-    // Direct reports linked by reportingTo
-    const reports = employees.filter(e => 
-      e.reportingTo === currentUser.id || 
-      e.reportingTo === currentUser.employeeCode ||
-      (e.reportingTo && e.reportingTo.toLowerCase() === currentUser.name.toLowerCase())
-    );
-
-    // Fallback if reportingTo is not populated yet
-    if (reports.length === 0) {
-      if (currentUser.hierarchyLevel === 'zsm') {
-        return employees.filter(e => 
-          e.id !== currentUser.id && 
-          (e.zone === currentUser.zone || e.branch === currentUser.branch)
-        );
-      }
-      if (currentUser.hierarchyLevel === 'rsm' || currentUser.hierarchyLevel === 'manager' || currentUser.hierarchyLevel === 'team_lead') {
-        return employees.filter(e => 
-          e.id !== currentUser.id && 
-          (e.hierarchyLevel === 'be' || e.role === 'employee') && 
-          (e.zone === currentUser.zone || e.branch === currentUser.branch)
-        );
-      }
+    // ZSM (Zonal Sales Manager): Direct oversight of entire zonal fleet (RSMs + BEs)
+    if (currentUser.hierarchyLevel === 'zsm') {
+      return employees.filter(e =>
+        e.id !== currentUser.id &&
+        (e.zone === currentUser.zone || e.branch === currentUser.branch || e.reportingTo === currentUser.id)
+      );
     }
 
-    return reports;
+    // RSM / Regional Manager: Direct reports linked by reportingTo (ID, employeeCode, or normalized name)
+    const normalizedName = (currentUser.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const reports = employees.filter(e => {
+      if (e.id === currentUser.id) return false;
+      if (!e.reportingTo) return false;
+      const rep = e.reportingTo.trim();
+      if (rep === currentUser.id || rep === currentUser.employeeCode) return true;
+      const repNorm = rep.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return repNorm.length > 2 && (repNorm === normalizedName || normalizedName.includes(repNorm) || repNorm.includes(normalizedName));
+    });
+
+    if (reports.length > 0) {
+      return reports;
+    }
+
+    // Fallback if reportingTo is not populated yet: territory/zone BEs
+    return employees.filter(e =>
+      e.id !== currentUser.id &&
+      (e.hierarchyLevel === 'be' || e.role === 'employee') &&
+      (e.zone === currentUser.zone || e.branch === currentUser.branch)
+    );
   }, [employees, currentUser]);
 
   const directReportIds = useMemo(() => new Set(directReports.map(e => e.id)), [directReports]);
@@ -116,7 +120,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
   const approvalTasks = useMemo(() => {
     return teamTasks.filter(t => {
       // Direct pending approval status or completed tasks needing manager sign-off
-      const isPending = t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'not_required'));
+      const isPending = t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || (t.approvalStatus as string) === 'pending' || t.approvalStatus === 'not_required'));
       if (approvalFilter === 'pending') {
         return isPending && t.approvalStatus !== 'approved' && t.approvalStatus !== 'rejected';
       }
@@ -131,8 +135,8 @@ export const TeamHub: React.FC<TeamHubProps> = ({
   }, [teamTasks, approvalFilter]);
 
   const pendingCount = useMemo(() => {
-    return teamTasks.filter(t => 
-      (t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || t.approvalStatus === 'not_required'))) &&
+    return teamTasks.filter(t =>
+      (t.approvalStatus === 'pending' || (t.status === 'completed' && (!t.approvalStatus || (t.approvalStatus as string) === 'pending' || t.approvalStatus === 'not_required'))) &&
       t.approvalStatus !== 'approved' &&
       t.approvalStatus !== 'rejected'
     ).length;
@@ -141,7 +145,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
   // Filtered Roster
   const filteredMembers = useMemo(() => {
     return directReports.filter(member => {
-      const matchesSearch = 
+      const matchesSearch =
         member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.designation && member.designation.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (member.employeeCode && member.employeeCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -221,7 +225,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
-      
+
       {/* Top Header Card with Apple Aesthetic */}
       <div className="bg-white rounded-[28px] p-6 shadow-xs border border-[#E5E5EA] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -243,28 +247,25 @@ export const TeamHub: React.FC<TeamHubProps> = ({
         <div className="bg-[#EFEFF4] p-1 rounded-full flex items-center shrink-0 self-start md:self-auto border border-[#E5E5EA]">
           <button
             onClick={() => setActiveSegment('roster')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-              activeSegment === 'roster'
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${activeSegment === 'roster'
                 ? 'bg-white text-[#0A84FF] shadow-xs'
                 : 'text-[#8E8E93] hover:text-[#1C1C1E]'
-            }`}
+              }`}
           >
             <Users size={14} />
             <span>Team Members</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-              activeSegment === 'roster' ? 'bg-[#0A84FF]/15 text-[#0A84FF]' : 'bg-[#E5E5EA] text-[#8E8E93]'
-            }`}>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeSegment === 'roster' ? 'bg-[#0A84FF]/15 text-[#0A84FF]' : 'bg-[#E5E5EA] text-[#8E8E93]'
+              }`}>
               {directReports.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveSegment('approvals')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-              activeSegment === 'approvals'
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${activeSegment === 'approvals'
                 ? 'bg-white text-[#0A84FF] shadow-xs'
                 : 'text-[#8E8E93] hover:text-[#1C1C1E]'
-            }`}
+              }`}
           >
             <CheckCircle2 size={14} />
             <span>Task Approvals</span>
@@ -326,7 +327,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
       {/* VIEW 1: TEAM MEMBERS ROSTER */}
       {activeSegment === 'roster' && (
         <div className="space-y-4">
-          
+
           {/* Search & Status Filter Bar */}
           <div className="bg-white rounded-[24px] p-3.5 shadow-xs border border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Search Input */}
@@ -353,32 +354,29 @@ export const TeamHub: React.FC<TeamHubProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  statusFilter === 'all'
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${statusFilter === 'all'
                     ? 'bg-[#1C1C1E] text-white'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 All ({directReports.length})
               </button>
               <button
                 onClick={() => setStatusFilter('active')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  statusFilter === 'active'
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${statusFilter === 'active'
                     ? 'bg-[#30D158] text-white'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-[#30D158]" />
                 Active ({activeCount})
               </button>
               <button
                 onClick={() => setStatusFilter('offline')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  statusFilter === 'offline'
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${statusFilter === 'offline'
                     ? 'bg-slate-700 text-white'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 Offline ({offlineCount})
               </button>
@@ -417,19 +415,17 @@ export const TeamHub: React.FC<TeamHubProps> = ({
                           <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-[#0A84FF] to-[#64D2FF] text-white font-bold text-lg flex items-center justify-center shadow-xs">
                             {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                           </div>
-                          <span 
-                            className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                              member.isCheckedIn ? 'bg-[#30D158]' : 'bg-[#8E8E93]'
-                            }`}
+                          <span
+                            className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${member.isCheckedIn ? 'bg-[#30D158]' : 'bg-[#8E8E93]'
+                              }`}
                           />
                         </div>
 
                         <div className="text-right">
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                            member.isCheckedIn 
-                              ? 'bg-[#30D158]/15 text-[#30D158]' 
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${member.isCheckedIn
+                              ? 'bg-[#30D158]/15 text-[#30D158]'
                               : 'bg-slate-100 text-slate-500'
-                          }`}>
+                            }`}>
                             {member.isCheckedIn ? '● Active' : 'Offline'}
                           </span>
                           <p className="text-[10px] font-mono text-[#8E8E93] mt-1">
@@ -470,10 +466,10 @@ export const TeamHub: React.FC<TeamHubProps> = ({
                         <div className="flex items-center justify-between text-[#8E8E93]">
                           <span>Duty Status:</span>
                           <span className="font-semibold text-[#1C1C1E]">
-                            {member.isCheckedIn 
-                              ? (latestCheckIn?.checkInTime 
-                                  ? `In since ${latestCheckIn.checkInTime.slice(0, 5)}` 
-                                  : 'Punched In')
+                            {member.isCheckedIn
+                              ? latestCheckIn?.checkInTime
+                                ? `In since ${latestCheckIn.checkInTime}`
+                                : 'Punched In'
                               : 'Not on duty today'}
                           </span>
                         </div>
@@ -529,23 +525,21 @@ export const TeamHub: React.FC<TeamHubProps> = ({
       {/* VIEW 2: TASK APPROVALS */}
       {activeSegment === 'approvals' && (
         <div className="space-y-4">
-          
+
           {/* Approval Filter Bar */}
           <div className="bg-white rounded-[24px] p-3.5 shadow-xs border border-[#E5E5EA] flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setApprovalFilter('pending')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                  approvalFilter === 'pending'
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${approvalFilter === 'pending'
                     ? 'bg-[#0A84FF] text-white shadow-xs'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 <span>Pending Approval</span>
                 {pendingCount > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                    approvalFilter === 'pending' ? 'bg-white text-[#0A84FF]' : 'bg-[#FF3B30] text-white'
-                  }`}>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${approvalFilter === 'pending' ? 'bg-white text-[#0A84FF]' : 'bg-[#FF3B30] text-white'
+                    }`}>
                     {pendingCount}
                   </span>
                 )}
@@ -553,33 +547,30 @@ export const TeamHub: React.FC<TeamHubProps> = ({
 
               <button
                 onClick={() => setApprovalFilter('approved')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  approvalFilter === 'approved'
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${approvalFilter === 'approved'
                     ? 'bg-[#30D158] text-white shadow-xs'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 Approved
               </button>
 
               <button
                 onClick={() => setApprovalFilter('rejected')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  approvalFilter === 'rejected'
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${approvalFilter === 'rejected'
                     ? 'bg-[#FF3B30] text-white shadow-xs'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 Rejected
               </button>
 
               <button
                 onClick={() => setApprovalFilter('all')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  approvalFilter === 'all'
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${approvalFilter === 'all'
                     ? 'bg-[#1C1C1E] text-white shadow-xs'
                     : 'bg-[#F2F2F7] text-[#8E8E93] hover:text-[#1C1C1E]'
-                }`}
+                  }`}
               >
                 All Team Tasks ({teamTasks.length})
               </button>
@@ -616,7 +607,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({
                     <div className="space-y-2 flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         {getPriorityBadge(task.priority)}
-                        
+
                         {isApproved && (
                           <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#30D158]/15 text-[#30D158] flex items-center gap-1">
                             <Check size={10} strokeWidth={3} /> Approved

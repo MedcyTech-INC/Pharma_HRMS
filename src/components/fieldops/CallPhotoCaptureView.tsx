@@ -15,7 +15,8 @@ import {
  Sparkles,
  Navigation,
  Plus,
- Users
+ Users,
+ Upload
 } from 'lucide-react';
 import { FieldVisit, Language, Employee } from '../../types';
 import * as fieldVisitService from '../../lib/services/field-visit-service';
@@ -50,6 +51,7 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
  const [cameraError, setCameraError] = useState<string | null>(null);
  const videoRef = useRef<HTMLVideoElement>(null);
  const streamRef = useRef<MediaStream | null>(null);
+ const fileInputRef = useRef<HTMLInputElement>(null);
 
  // Photo & Location Capture State
  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
@@ -296,6 +298,48 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
   setCapturedPhoto(dataUrl);
   stopCamera();
+ };
+
+ const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+   const img = new Image();
+   img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || 1280;
+    canvas.height = img.naturalHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const bannerHeight = 80;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(0, canvas.height - bannerHeight, canvas.width, bannerHeight);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px monospace';
+    const nowStr = new Date().toLocaleString();
+    ctx.fillText(`ORCA LABS PHARMA HRMS • ${activeVisit?.title || 'FIELD CALL'}`, 24, canvas.height - 48);
+
+    ctx.fillStyle = '#2dd4bf';
+    ctx.font = 'bold 18px monospace';
+    const coordsStr = currentLocation
+     ? `GPS: ${currentLocation.lat.toFixed(5)}, ${currentLocation.lng.toFixed(5)}`
+     : 'GPS: Location Acquired';
+    ctx.fillText(`${nowStr} • ${coordsStr}`, 24, canvas.height - 20);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setCapturedPhoto(dataUrl);
+    stopCamera();
+    setCameraError(null);
+   };
+   img.src = event.target?.result as string;
+  };
+  reader.readAsDataURL(file);
  };
 
  // 5. Start Call Action
@@ -614,6 +658,13 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
          <div className="text-rose-400 text-xs font-bold flex flex-col items-center gap-2">
           <AlertCircle className="w-6 h-6"/>
           <span>{cameraError}</span>
+          <button
+           type="button"
+           onClick={() => fileInputRef.current?.click()}
+           className="mt-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-2"
+          >
+           <Camera className="w-4 h-4" /> Open Native Camera / Choose Photo
+          </button>
           {isLocalMode && (
            <button
             type="button"
@@ -628,16 +679,32 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
          <div className="space-y-2">
           <Camera className="w-8 h-8 text-slate-600 mx-auto"/>
           <p className="text-xs text-slate-400 font-medium">Camera stopped</p>
+          <button
+           type="button"
+           onClick={() => fileInputRef.current?.click()}
+           className="mt-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold text-xs border border-slate-700 transition-colors cursor-pointer inline-flex items-center gap-2"
+          >
+           <Upload className="w-4 h-4"/> Use Native Camera / File
+          </button>
          </div>
         )}
        </div>
       )}
      </div>
 
+     <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      className="hidden"
+      onChange={handleFileUpload}
+     />
+
      {/* Action Buttons Toolbar */}
      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
       {!capturedPhoto ? (
-       <div className="w-full flex justify-center">
+       <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3">
         <button
          type="button"
          onClick={snapPhoto}
@@ -645,6 +712,13 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
          className="px-8 py-3.5 rounded-2xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-black text-sm flex items-center gap-2.5 shadow-sm shadow-teal-500/20 transition-all cursor-pointer hover:scale-105"
         >
          <Camera className="w-5 h-5"/> Capture Proof Photo
+        </button>
+        <button
+         type="button"
+         onClick={() => fileInputRef.current?.click()}
+         className="px-5 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold text-xs border border-slate-700 transition-all flex items-center gap-2 cursor-pointer"
+        >
+         <Upload className="w-4 h-4"/> Native Camera
         </button>
        </div>
       ) : (
