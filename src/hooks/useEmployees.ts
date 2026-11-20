@@ -14,11 +14,46 @@ export function useEmployees() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const saveLocalData = (emps: Employee[]) => {
+    try {
+      // Strip heavy photo payloads and historical archives before caching to prevent QuotaExceededError (5MB limit)
+      const lightweightEmps = emps.map(emp => ({
+        ...emp,
+        attendanceRecords: (emp.attendanceRecords || []).slice(-5).map(a => ({
+          date: a.date,
+          status: a.status,
+          note: a.note
+        })),
+        checkInLogs: (emp.checkInLogs || []).slice(-5).map(c => ({
+          ...c,
+          photoUrl: undefined,
+          checkOutPhotoUrl: undefined
+        })),
+        locationPins: (emp.locationPins || []).slice(-5).map(p => ({
+          ...p,
+          photoUrl: undefined
+        })),
+        payslips: (emp.payslips || []).slice(-3)
+      }));
+
+      localStorage.setItem('pharma_hrms_local_employees', JSON.stringify(lightweightEmps));
+    } catch (storageErr) {
+      console.warn('Could not cache employees to localStorage:', storageErr);
+      try {
+        // If quota was already corrupted or exceeded by previous sessions, purge old cache safely
+        localStorage.removeItem('pharma_hrms_local_employees');
+        localStorage.removeItem('hrms_local_employees');
+      } catch {
+        // Ignore
+      }
+    }
+  };
+
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         await employeeService.seedInitialDatabase();
       } catch (seedErr) {
@@ -31,7 +66,7 @@ export function useEmployees() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('pharma_hrms_cached_employees', JSON.stringify(emps));
         }
-      } catch {}
+      } catch { }
     } catch (err: any) {
       console.error('Error fetching Supabase employee data:', err);
       const errDetails = err?.message || err?.details || 'Database connection offline.';
