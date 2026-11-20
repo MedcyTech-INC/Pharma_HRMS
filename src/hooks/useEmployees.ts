@@ -29,9 +29,36 @@ export function useEmployees() {
 
   const saveLocalData = (emps: Employee[]) => {
     try {
-      localStorage.setItem('pharma_hrms_local_employees', JSON.stringify(emps));
+      // Strip heavy photo payloads and historical archives before caching to prevent QuotaExceededError (5MB limit)
+      const lightweightEmps = emps.map(emp => ({
+        ...emp,
+        attendanceRecords: (emp.attendanceRecords || []).slice(-5).map(a => ({
+          date: a.date,
+          status: a.status,
+          note: a.note
+        })),
+        checkInLogs: (emp.checkInLogs || []).slice(-5).map(c => ({
+          ...c,
+          photoUrl: undefined,
+          checkOutPhotoUrl: undefined
+        })),
+        locationPins: (emp.locationPins || []).slice(-5).map(p => ({
+          ...p,
+          photoUrl: undefined
+        })),
+        payslips: (emp.payslips || []).slice(-3)
+      }));
+
+      localStorage.setItem('pharma_hrms_local_employees', JSON.stringify(lightweightEmps));
     } catch (storageErr) {
       console.warn('Could not cache employees to localStorage:', storageErr);
+      try {
+        // If quota was already corrupted or exceeded by previous sessions, purge old cache safely
+        localStorage.removeItem('pharma_hrms_local_employees');
+        localStorage.removeItem('hrms_local_employees');
+      } catch {
+        // Ignore
+      }
     }
   };
 
