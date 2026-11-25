@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Language, Employee, FieldVisit } from '../types';
 import AssignVisitModal from './AssignVisitModal';
-import BulkUploadModal from './BulkUploadModal';
 import * as fieldVisitService from '../lib/services/field-visit-service';
 import { getTodayCheckInLocations, EmployeeCheckInLocation } from '../lib/services/attendance-service';
 import { supabase } from '../lib/supabase-client';
-import { Navigation2, UserCheck, Calendar, MapPin, LocateFixed, Users, Phone, Clock, CheckCircle2, ChevronRight, PhoneIncoming, Radio, Camera, ZoomIn, Maximize2, FileText, Building2, FileSpreadsheet } from 'lucide-react';
+import { Navigation2, UserCheck, Calendar, MapPin, LocateFixed, Users, Phone, Clock, CheckCircle2, ChevronRight, PhoneIncoming, Radio, Camera, ZoomIn, Maximize2, FileText, Building2 } from 'lucide-react';
 // Live tracking has been removed in favor of task-based workflow
 import { ImageDraggableLightboxModal, ImageLightboxData } from './fieldops/ImageDraggableLightboxModal';
 import { EmployeeLocationModal, EmployeeLocationData } from './fieldops/EmployeeLocationModal';
@@ -20,8 +19,6 @@ interface FieldOpsModuleProps {
 
 export default function FieldOpsModule({ language, isLocalMode, employees, adminId }: FieldOpsModuleProps) {
  const [showAssignModal, setShowAssignModal] = useState(false);
- const [showBulkUpload, setShowBulkUpload] = useState(false);
- const [bulkUploadEmployeeId, setBulkUploadEmployeeId] = useState<string | null>(null);
  const [visits, setVisits] = useState<FieldVisit[]>([]);
  const [checkIns, setCheckIns] = useState<EmployeeCheckInLocation[]>([]);
  const [loading, setLoading] = useState(true);
@@ -175,16 +172,6 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
      </p>
     </div>
     <div className="flex flex-col sm:flex-row items-center gap-3">
-     <button
-      onClick={() => {
-       setBulkUploadEmployeeId(null);
-       setShowBulkUpload(true);
-      }}
-      className="bg-[#E8F4FF] hover:bg-[#D1E8FF] text-[#0A84FF] px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors cursor-pointer text-xs shadow-xs"
-     >
-      <FileSpreadsheet className="w-4 h-4"/> Bulk Upload Calls
-     </button>
-
      <button
       onClick={() => setShowAssignModal(true)}
       className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-sm shadow-teal-600/20 cursor-pointer text-xs"
@@ -577,45 +564,31 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto shrink-0">
-               <button
-                type="button"
-                onClick={() => {
-                 setBulkUploadEmployeeId(emp.id);
-                 setShowBulkUpload(true);
-                }}
-                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold bg-[#E8F4FF] hover:bg-[#D1E8FF] text-[#0A84FF] flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-xs shrink-0 shadow-2xs border border-blue-200/50"
-                title={`Bulk upload doctor visits directly for ${emp.name}`}
-               >
-                <FileSpreadsheet className="w-4 h-4" /> Bulk Upload Calls
-               </button>
-
-               <button
-                type="button"
-                onClick={() => {
-                 setSelectedRouteMapData({
-                  employee: emp,
-                  startLocation: {
-                   lat: empLat,
-                   lng: empLng,
-                   label: empLocationName,
-                   time: startTime
-                  },
-                  endLocation: endTime !== '--:--' ? {
-                   lat: empLat,
-                   lng: empLng,
-                   label: `${empLocationName} (Return)`,
-                   time: endTime
-                  } : undefined,
-                  visits: empVisits,
-                  initialSelectedVisitId: null
-                 });
-                }}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center gap-2.5 shadow-md shadow-teal-600/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider shrink-0"
-               >
-                <Navigation2 className="w-4 h-4 fill-white" /> View Entire Route Map
-               </button>
-              </div>
+              <button
+               type="button"
+               onClick={() => {
+                setSelectedRouteMapData({
+                 employee: emp,
+                 startLocation: {
+                  lat: empLat,
+                  lng: empLng,
+                  label: empLocationName,
+                  time: startTime
+                 },
+                 endLocation: endTime !== '--:--' ? {
+                  lat: empLat,
+                  lng: empLng,
+                  label: `${empLocationName} (Return)`,
+                  time: endTime
+                 } : undefined,
+                 visits: empVisits,
+                 initialSelectedVisitId: null
+                });
+               }}
+               className="w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center gap-2.5 shadow-md shadow-teal-600/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider shrink-0"
+              >
+               <Navigation2 className="w-4 h-4 fill-white" /> View Entire Route Map
+              </button>
              </div>
             </div>
            )}
@@ -793,22 +766,7 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
     />
    )}
 
-   {showBulkUpload && (
-    <BulkUploadModal
-     onClose={() => {
-      setShowBulkUpload(false);
-      setBulkUploadEmployeeId(null);
-     }}
-     employees={fieldEmployees}
-     initialEmployeeId={bulkUploadEmployeeId || undefined}
-     currentUser={employees.find(e => e.id === adminId) || { id: adminId, name: 'Admin', role: 'admin' } as Employee}
-     onSuccess={() => {
-      setShowBulkUpload(false);
-      setBulkUploadEmployeeId(null);
-      loadData();
-     }}
-    />
-   )}
+
 
 
 
