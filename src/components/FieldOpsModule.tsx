@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Language, Employee, FieldVisit } from '../types';
 import AssignVisitModal from './AssignVisitModal';
+import BulkUploadModal from './BulkUploadModal';
 import * as fieldVisitService from '../lib/services/field-visit-service';
 import { getTodayCheckInLocations, EmployeeCheckInLocation } from '../lib/services/attendance-service';
 import { supabase } from '../lib/supabase-client';
-import { Navigation2, UserCheck, Calendar, MapPin, LocateFixed, Users, Phone, Clock, CheckCircle2, ChevronRight, PhoneIncoming, Radio, Camera, ZoomIn, Maximize2, FileText } from 'lucide-react';
+import { Navigation2, UserCheck, Calendar, MapPin, LocateFixed, Users, Phone, Clock, CheckCircle2, ChevronRight, PhoneIncoming, Radio, Camera, ZoomIn, Maximize2, FileText, Building2, FileSpreadsheet } from 'lucide-react';
 // Live tracking has been removed in favor of task-based workflow
 import { ImageDraggableLightboxModal, ImageLightboxData } from './fieldops/ImageDraggableLightboxModal';
 import { EmployeeLocationModal, EmployeeLocationData } from './fieldops/EmployeeLocationModal';
+import { LiveRouteMapModal } from './fieldops/LiveRouteMapModal';
 
 interface FieldOpsModuleProps {
  language: Language;
@@ -18,6 +20,8 @@ interface FieldOpsModuleProps {
 
 export default function FieldOpsModule({ language, isLocalMode, employees, adminId }: FieldOpsModuleProps) {
  const [showAssignModal, setShowAssignModal] = useState(false);
+ const [showBulkUpload, setShowBulkUpload] = useState(false);
+ const [bulkUploadEmployeeId, setBulkUploadEmployeeId] = useState<string | null>(null);
  const [visits, setVisits] = useState<FieldVisit[]>([]);
  const [checkIns, setCheckIns] = useState<EmployeeCheckInLocation[]>([]);
  const [loading, setLoading] = useState(true);
@@ -33,6 +37,13 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
  // Modals for image zoom/drag and location map inspection
  const [selectedPhotoData, setSelectedPhotoData] = useState<ImageLightboxData | null>(null);
  const [selectedLocationData, setSelectedLocationData] = useState<EmployeeLocationData | null>(null);
+ const [selectedRouteMapData, setSelectedRouteMapData] = useState<{
+  employee: Employee;
+  startLocation: { lat: number; lng: number; label: string; time?: string };
+  endLocation?: { lat: number; lng: number; label: string; time?: string };
+  visits: FieldVisit[];
+  initialSelectedVisitId?: string | null;
+ } | null>(null);
 
 
  // Filter out Executive Directors / Management who do not participate in field operations & calls
@@ -164,12 +175,21 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
      </p>
     </div>
     <div className="flex flex-col sm:flex-row items-center gap-3">
+     <button
+      onClick={() => {
+       setBulkUploadEmployeeId(null);
+       setShowBulkUpload(true);
+      }}
+      className="bg-[#E8F4FF] hover:bg-[#D1E8FF] text-[#0A84FF] px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors cursor-pointer text-xs shadow-xs"
+     >
+      <FileSpreadsheet className="w-4 h-4"/> Bulk Upload Calls
+     </button>
 
      <button
       onClick={() => setShowAssignModal(true)}
-      className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-sm shadow-teal-600/20 cursor-pointer"
+      className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-sm shadow-teal-600/20 cursor-pointer text-xs"
      >
-      <Navigation2 className="w-5 h-5"/> Assign New Visit
+      <Navigation2 className="w-4 h-4"/> Assign New Visit
      </button>
     </div>
    </div>
@@ -521,33 +541,82 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
            </div>
           </div>
 
-           {/* Expanded Drill-down View */}
+           {/* Clean Dropdown View: View Entire Route Map */}
            {expandedEmployeeId === emp.id && (
-            <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-4">
-             <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Today's Visits &amp; Summaries</h5>
-             {empVisits.length === 0 ? (
-              <p className="text-xs text-slate-500 italic">No visits assigned for today.</p>
-             ) : (
-              <div className="space-y-3">
-               {empVisits.map(visit => (
-                <div key={visit.id} className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col gap-2">
-                 <div className="flex justify-between items-start">
-                  <div>
-                   <p className="text-xs font-bold text-slate-800">{visit.title}</p>
-                   <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3"/>{visit.assignedAddress || 'No address'}</p>
-                  </div>
-                  <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${getStatusBadge(visit.status)}`}>{visit.status}</span>
-                 </div>
-                 {(visit.status === 'COMPLETED' || visit.completionNotes) && (
-                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-1">
-                   <p className="text-[10px] font-bold text-slate-600 mb-1">Visit Summary:</p>
-                   <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{visit.completionNotes ? visit.completionNotes : <span className="italic text-slate-400">No summary provided</span>}</p>
-                  </div>
+            <div className="bg-gradient-to-r from-teal-50/70 via-white to-slate-50 border-t border-slate-200/90 p-5 sm:p-6 rounded-b-2xl">
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+               <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-600/20 shrink-0">
+                <Navigation2 className="w-6 h-6" />
+               </div>
+               <div>
+                <div className="flex items-center gap-2">
+                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                  Entire Day Tour Route Map
+                 </h4>
+                 {empVisits.some(v => v.status === 'EN_ROUTE' || v.status === 'ARRIVED' || v.status === 'IN_PROGRESS') && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                   <Radio className="w-2.5 h-2.5 text-amber-600" /> In-Transit Active
+                  </span>
                  )}
                 </div>
-               ))}
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                 View the full circuit on one map with distinct markers (● Office Start, ■ Doctor Calls) and click any doctor for details.
+                </p>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-700 mt-2">
+                 <span className="flex items-center gap-1.5 text-slate-600">
+                  <Building2 className="w-3.5 h-3.5 text-sky-600" />
+                  Office Punch-in: <span className="font-mono text-slate-900">{startTime}</span>
+                 </span>
+                 <span>•</span>
+                 <span className="flex items-center gap-1.5 text-teal-800">
+                  <Users className="w-3.5 h-3.5 text-teal-600" />
+                  {empVisits.length} Scheduled Calls ({callsTaken} Completed)
+                 </span>
+                </div>
+               </div>
               </div>
-             )}
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto shrink-0">
+               <button
+                type="button"
+                onClick={() => {
+                 setBulkUploadEmployeeId(emp.id);
+                 setShowBulkUpload(true);
+                }}
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold bg-[#E8F4FF] hover:bg-[#D1E8FF] text-[#0A84FF] flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-xs shrink-0 shadow-2xs border border-blue-200/50"
+                title={`Bulk upload doctor visits directly for ${emp.name}`}
+               >
+                <FileSpreadsheet className="w-4 h-4" /> Bulk Upload Calls
+               </button>
+
+               <button
+                type="button"
+                onClick={() => {
+                 setSelectedRouteMapData({
+                  employee: emp,
+                  startLocation: {
+                   lat: empLat,
+                   lng: empLng,
+                   label: empLocationName,
+                   time: startTime
+                  },
+                  endLocation: endTime !== '--:--' ? {
+                   lat: empLat,
+                   lng: empLng,
+                   label: `${empLocationName} (Return)`,
+                   time: endTime
+                  } : undefined,
+                  visits: empVisits,
+                  initialSelectedVisitId: null
+                 });
+                }}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center gap-2.5 shadow-md shadow-teal-600/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer text-xs uppercase tracking-wider shrink-0"
+               >
+                <Navigation2 className="w-4 h-4 fill-white" /> View Entire Route Map
+               </button>
+              </div>
+             </div>
             </div>
            )}
           </div>
@@ -724,21 +793,61 @@ export default function FieldOpsModule({ language, isLocalMode, employees, admin
     />
    )}
 
-
-
-   {/* Lightbox Modal for Dragging and Enlarging Uploaded Start/End Photos */}
-   {selectedPhotoData && (
-    <ImageDraggableLightboxModal
-     data={selectedPhotoData}
-     onClose={() => setSelectedPhotoData(null)}
+   {showBulkUpload && (
+    <BulkUploadModal
+     onClose={() => {
+      setShowBulkUpload(false);
+      setBulkUploadEmployeeId(null);
+     }}
+     employees={fieldEmployees}
+     initialEmployeeId={bulkUploadEmployeeId || undefined}
+     currentUser={employees.find(e => e.id === adminId) || { id: adminId, name: 'Admin', role: 'admin' } as Employee}
+     onSuccess={() => {
+      setShowBulkUpload(false);
+      setBulkUploadEmployeeId(null);
+      loadData();
+     }}
     />
    )}
+
+
 
    {/* Location Modal for Employee Map View straight from card top right */}
    {selectedLocationData && (
     <EmployeeLocationModal
      data={selectedLocationData}
      onClose={() => setSelectedLocationData(null)}
+    />
+   )}
+
+   {/* Live Route Map Modal (Full-Day Tour + Doctor Details Window) */}
+   {selectedRouteMapData && (
+    <LiveRouteMapModal
+     employee={selectedRouteMapData.employee}
+     startLocation={selectedRouteMapData.startLocation}
+     endLocation={selectedRouteMapData.endLocation}
+     visits={selectedRouteMapData.visits}
+     initialSelectedVisitId={selectedRouteMapData.initialSelectedVisitId}
+     onClose={() => setSelectedRouteMapData(null)}
+     onOpenPhoto={(url, title) => {
+      setSelectedPhotoData({
+       url,
+       title,
+       employeeName: selectedRouteMapData.employee.name,
+       employeeId: selectedRouteMapData.employee.id,
+       time: '--:--',
+       locationName: 'Doctor Visit Photo Proof',
+       type: 'start'
+      });
+     }}
+    />
+   )}
+
+   {/* Lightbox Modal for Dragging and Enlarging Photos - Placed AFTER LiveRouteMapModal to guarantee topmost stack */}
+   {selectedPhotoData && (
+    <ImageDraggableLightboxModal
+     data={selectedPhotoData}
+     onClose={() => setSelectedPhotoData(null)}
     />
    )}
   </div>

@@ -924,27 +924,48 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
           </span>
 
           {isCompleted ? (
-           <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
-            <CheckCircle2 className="w-3.5 h-3.5"/> Visit Verified
-           </span>
+           <div className="flex items-center gap-2">
+            <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
+             <CheckCircle2 className="w-3.5 h-3.5"/> Visit Completed
+            </span>
+            {visit.approvalStatus === 'pending' ? (
+             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              Pending EOD Approval
+             </span>
+            ) : visit.approvalStatus === 'approved' ? (
+             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ✓ Lead Approved
+             </span>
+            ) : null}
+           </div>
           ) : isOngoing ? (
            <button
             type="button"
             onClick={handleInitiateEndCall}
-            className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-xs shadow-amber-500/20"
            >
-            <Square className="w-3 h-3 fill-white"/> Depart & Close Visit
+            <Square className="w-3 h-3 fill-white"/> Depart & Snap Exit Proof
            </button>
-          ) : visit.approvalStatus === 'pending' ? (
-           <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center gap-1 cursor-not-allowed" title="Your direct Team Lead must approve this visit before you can start">
-            ⏳ Awaiting Lead Approval
-           </span>
           ) : visit.approvalStatus === 'rejected' ? (
-           <span className="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1" title={visit.rejectionReason || 'Rejected by Lead'}>
-            ✗ Rejected by Lead
-           </span>
+           <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1" title={visit.rejectionReason || 'Rejected by Lead'}>
+             ✗ Rejected by Lead
+            </span>
+            <button
+             type="button"
+             onClick={() => handleInitiateStartCall(visit)}
+             className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
+            >
+             <Play className="w-3 h-3 fill-white"/> Re-visit & Snap Proof
+            </button>
+           </div>
           ) : (
            <div className="flex items-center gap-2">
+            {visit.approvalStatus === 'pending' && (
+             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md" title="This call will be reviewed by your Lead at End of Day">
+              EOD Review
+             </span>
+            )}
             <button
              type="button"
              onClick={() => {
@@ -955,14 +976,14 @@ export const CallPhotoCaptureView: React.FC<CallPhotoCaptureViewProps> = ({
                 .catch(err => alert('Failed to request reschedule: ' + err.message));
               }
              }}
-             className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs flex items-center gap-1 cursor-pointer"
+             className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs flex items-center gap-1 cursor-pointer"
             >
-             Request Reschedule
+             Reschedule
             </button>
             <button
              type="button"
              onClick={() => handleInitiateStartCall(visit)}
-             className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
+             className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shadow-teal-600/20"
             >
              <Play className="w-3 h-3 fill-white"/> Arrive & Snap Proof
             </button>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut, RotateCcw, Move, Maximize2, Download, Camera, User } from 'lucide-react';
 
 export interface ImageLightboxData {
@@ -89,9 +90,9 @@ export const ImageDraggableLightboxModal: React.FC<ImageDraggableLightboxModalPr
  // Strictly use the uploaded employee photo URL
  const displayImage = data.url;
 
- return (
+ const modalContent = (
   <div
-   className="fixed inset-0 z-50 bg-slate-950/80 flex items-center justify-center p-4 select-none"
+   className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 select-none"
    onClick={onClose}
   >
    <div
@@ -248,4 +249,6 @@ export const ImageDraggableLightboxModal: React.FC<ImageDraggableLightboxModalPr
    </div>
   </div>
  );
+
+ return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

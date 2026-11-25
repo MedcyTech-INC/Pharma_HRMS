@@ -211,7 +211,16 @@ export const AppRouter: React.FC<AppRouterProps> = ({
      holidays={holidays}
     />
    );
-  case 'fieldOps':
+  case 'fieldOps': {
+   const isAdmin = currentUser.role === 'admin' || currentUser.hierarchyLevel === 'admin';
+   if (!isAdmin) {
+    return (
+     <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+      <h3 className="text-base font-bold text-slate-800">Access Restricted</h3>
+      <p className="text-xs text-slate-500 mt-1">Live tracking and field visit register is strictly accessible by Admins only.</p>
+     </div>
+    );
+   }
    return (
     <FieldOpsModule
      language={language}
@@ -220,6 +229,7 @@ export const AppRouter: React.FC<AppRouterProps> = ({
      adminId={currentUser.id}
     />
    );
+  }
 
   case 'leaveApprovals':
    return (

@@ -134,10 +134,8 @@ export async function bulkCreateVisits(visits: Partial<FieldVisit>[]): Promise<v
     category: visit.category || 'doctor',
     doctor_name: visit.doctorName || null,
     clinic_name: visit.clinicName || null,
-    chemist_shop_name: visit.chemistShopName || null,
-    stockist_name: visit.stockistName || null,
-    hospital_name: visit.hospitalName || null,
-    visit_purpose: visit.visitPurpose || null
+    visit_purpose: visit.visitPurpose || null,
+    approval_status: visit.approvalStatus || 'approved'
   }));
 
   const { error } = await supabase
@@ -468,6 +466,20 @@ export async function approveFieldVisit(visitId: string, approverId: string): Pr
       rejection_reason: null
     })
     .eq('id', visitId);
+
+  if (error) throw error;
+}
+
+export async function approveAllFieldVisits(visitIds: string[], approverId: string): Promise<void> {
+  if (!visitIds.length) return;
+  const { error } = await supabase
+    .from('pharma_hrms_field_visits')
+    .update({
+      approval_status: 'approved',
+      approved_by: approverId,
+      rejection_reason: null
+    })
+    .in('id', visitIds);
 
   if (error) throw error;
 }

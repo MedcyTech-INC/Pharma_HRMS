@@ -25,6 +25,30 @@ export function useFieldDuty(employeeId: string | undefined, isLocalMode: boolea
     loadSession();
   }, [loadSession]);
 
+  // 30-40 Minute Periodic GPS Sync while on active field duty (Zero Battery Drain)
+  useEffect(() => {
+    if (!session || session.status !== 'active' || isLocalMode || !employeeId) return;
+
+    const syncLocation = async () => {
+      try {
+        const loc = await getCurrentLocationSafe();
+        if (loc.latitude && loc.longitude) {
+          localStorage.setItem(`last_gps_ping_${employeeId}`, JSON.stringify({
+            lat: loc.latitude,
+            lng: loc.longitude,
+            time: new Date().toISOString()
+          }));
+        }
+      } catch {
+        // Silent catch for background heartbeat
+      }
+    };
+
+    // Run periodic sync every 30 minutes
+    const intervalId = setInterval(syncLocation, 30 * 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [session, isLocalMode, employeeId]);
+
   const startDuty = async (): Promise<{ success: boolean; error?: string }> => {
     if (isLocalMode || !employeeId) return { success: false, error: 'Cannot start in offline mode' };
     

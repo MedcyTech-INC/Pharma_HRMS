@@ -162,3 +162,8 @@ body {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Hide Leaflet & OpenStreetMap attribution watermarks for clean client UX */
+.leaflet-control-attribution {
+  display: none !important;
+}

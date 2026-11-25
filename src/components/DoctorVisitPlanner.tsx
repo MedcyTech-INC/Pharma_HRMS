@@ -23,7 +23,10 @@ import {
   ArrowRight,
   Filter,
   FileSpreadsheet,
-  HelpCircle
+  HelpCircle,
+  CheckCheck,
+  Camera,
+  Maximize2
 } from 'lucide-react';
 import { Joyride, STATUS } from 'react-joyride';
 const ComponentJoyride = Joyride as any;
@@ -33,6 +36,7 @@ import * as fieldVisitService from '../lib/services/field-visit-service';
 import AssignVisitModal from './AssignVisitModal';
 import BulkUploadModal from './BulkUploadModal';
 import EmployeeBulkUploadModal from './EmployeeBulkUploadModal';
+import { ImageDraggableLightboxModal, ImageLightboxData } from './fieldops/ImageDraggableLightboxModal';
 
 interface DoctorVisitPlannerProps {
   language: Language;
@@ -154,6 +158,8 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
   // Team Approvals Filter
   const [approvalFilter, setApprovalFilter] = useState<'pending' | 'all' | 'approved' | 'rejected'>('pending');
   const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('all');
+  const [selectedPhotoData, setSelectedPhotoData] = useState<ImageLightboxData | null>(null);
+  const [batchApproving, setBatchApproving] = useState(false);
 
   const weekDates = useMemo(() => {
     return Array.from({ length: 6 }).map((_, i) => { // Mon - Sat
@@ -211,6 +217,21 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
       await loadVisits();
     } catch (err: any) {
       alert("Failed to approve visit: " + err.message);
+    }
+  };
+
+  const handleApproveAll = async () => {
+    const pendingVisits = filteredTeamVisits.filter(v => v.approvalStatus === 'pending');
+    if (!pendingVisits.length) return;
+    if (!window.confirm(`Approve all ${pendingVisits.length} pending doctor call(s) for your team at once?`)) return;
+    setBatchApproving(true);
+    try {
+      await fieldVisitService.approveAllFieldVisits(pendingVisits.map(v => v.id), currentUser.id);
+      await loadVisits();
+    } catch (err: any) {
+      alert("Failed to batch approve: " + err.message);
+    } finally {
+      setBatchApproving(false);
     }
   };
 
@@ -626,13 +647,28 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
               </select>
             </div>
 
-            <button
-              onClick={() => { setModalMode('assign'); setIsAssignModalOpen(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0A84FF] hover:bg-[#0070DB] text-white rounded-full text-[13px] font-semibold transition-all shadow-md shadow-[#0A84FF]/20 cursor-pointer shrink-0"
-            >
-              <Plus size={15} />
-              <span>Assign Call to Member</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {filteredTeamVisits.some(v => v.approvalStatus === 'pending') && (
+                <button
+                  type="button"
+                  onClick={handleApproveAll}
+                  disabled={batchApproving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#30D158] hover:bg-[#25A244] disabled:opacity-50 text-white rounded-full text-[13px] font-semibold transition-all shadow-md shadow-[#30D158]/20 cursor-pointer shrink-0"
+                  title="Approve all pending doctor calls for your team"
+                >
+                  <CheckCheck size={15} />
+                  <span>{batchApproving ? 'Approving...' : `Approve All (${filteredTeamVisits.filter(v => v.approvalStatus === 'pending').length})`}</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => { setModalMode('assign'); setIsAssignModalOpen(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#0A84FF] hover:bg-[#0070DB] text-white rounded-full text-[13px] font-semibold transition-all shadow-md shadow-[#0A84FF]/20 cursor-pointer shrink-0"
+              >
+                <Plus size={15} />
+                <span>Assign Call to Member</span>
+              </button>
+            </div>
           </div>
 
           {/* Team Visits Roster */}
@@ -667,23 +703,25 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
                 {filteredTeamVisits.map((visit) => {
                   const emp = employees.find(e => e.id === visit.employeeId);
                   const isPending = visit.approvalStatus === 'pending';
+                  const isCompleted = visit.status === 'COMPLETED';
+                  const isOngoing = visit.status === 'IN_PROGRESS';
 
                   return (
                     <div
                       key={visit.id}
-                      className={`px-4 py-4 rounded-[14px] border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                      className={`p-4 rounded-[16px] border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
                         isPending
-                          ? 'bg-amber-50/60 border-amber-200/70'
+                          ? 'bg-amber-50/50 border-amber-200/80 shadow-xs'
                           : 'bg-[#F9F9FB] border-[#E5E5EA]'
                       }`}
                     >
-                      <div className="space-y-1.5 flex-1">
+                      <div className="space-y-2 flex-1 w-full">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white border border-[#E5E5EA] text-[#3C3C43]">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white border border-[#E5E5EA] text-[#3C3C43]">
                             {emp?.name || 'Representative'}
                           </span>
                           <span className="text-[#C7C7CC] text-xs">•</span>
-                          <span className="text-[13px] font-semibold text-[#1C1C1E]">
+                          <span className="text-[13px] font-black text-[#1C1C1E]">
                             {visit.doctorName || visit.title}
                           </span>
                           {visit.scheduledDate && (
@@ -691,27 +729,109 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
                               {visit.scheduledDate}{visit.scheduledStart && ` · ${visit.scheduledStart}`}
                             </span>
                           )}
+
+                          {/* Execution Status Badge */}
+                          {isCompleted ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <CheckCircle2 size={11} className="text-emerald-600" />
+                              <span>Completed{visit.completedAt ? ` at ${new Date(visit.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}{visit.durationMinutes ? ` (${visit.durationMinutes}m)` : ''}</span>
+                            </span>
+                          ) : isOngoing ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              <span>In Progress</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                              Scheduled
+                            </span>
+                          )}
                         </div>
+
                         {visit.clinicName && (
                           <p className="text-[12px] text-[#3C3C43] font-medium flex items-center gap-1.5">
-                            <Building size={11} className="text-[#0A84FF]" />
+                            <Building size={12} className="text-[#0A84FF]" />
                             {visit.clinicName}
                           </p>
                         )}
                         {visit.assignedAddress && (
                           <p className="text-[11px] text-[#8E8E93] flex items-center gap-1.5">
-                            <MapPin size={10} className="shrink-0" />
+                            <MapPin size={11} className="shrink-0" />
                             {visit.assignedAddress}
                           </p>
                         )}
                         {visit.visitPurpose && (
-                          <p className="text-[11px] text-[#3C3C43] bg-white border border-[#E5E5EA] px-2.5 py-1.5 rounded-lg font-medium inline-block">
+                          <p className="text-[11px] text-[#3C3C43] bg-white border border-[#E5E5EA] px-2.5 py-1 rounded-lg font-medium inline-block">
                             <strong>Agenda:</strong> {visit.visitPurpose}
                           </p>
                         )}
+
+                        {/* Submitted Proof Photos & DCR Report (Arrival & Departure photos) */}
+                        {(visit.startPhotoUrl || visit.proofPhotoUrl || visit.completionNotes || visit.pobAmount) && (
+                          <div className="bg-white/90 p-2.5 rounded-xl border border-slate-200/80 space-y-2 mt-1">
+                            {(visit.startPhotoUrl || visit.proofPhotoUrl) && (
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Field Proofs:</span>
+                                {visit.startPhotoUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedPhotoData({
+                                      url: visit.startPhotoUrl,
+                                      title: `${visit.doctorName || visit.title} - Arrival Proof`,
+                                      employeeName: emp?.name || 'Representative',
+                                      employeeId: visit.employeeId,
+                                      time: visit.startedAt ? new Date(visit.startedAt).toLocaleTimeString() : undefined,
+                                      locationName: visit.actualAddress || visit.clinicName,
+                                      type: 'start'
+                                    })}
+                                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 border border-teal-200/80 text-teal-800 text-[11px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    <img src={visit.startPhotoUrl} alt="Arrival Proof" className="w-5 h-5 rounded object-cover" />
+                                    <span>Arrival Photo</span>
+                                    <Maximize2 size={10} className="text-teal-600" />
+                                  </button>
+                                )}
+                                {visit.proofPhotoUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedPhotoData({
+                                      url: visit.proofPhotoUrl,
+                                      title: `${visit.doctorName || visit.title} - Departure Proof`,
+                                      employeeName: emp?.name || 'Representative',
+                                      employeeId: visit.employeeId,
+                                      time: visit.completedAt ? new Date(visit.completedAt).toLocaleTimeString() : undefined,
+                                      locationName: visit.actualAddress || visit.clinicName,
+                                      type: 'end'
+                                    })}
+                                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    <img src={visit.proofPhotoUrl} alt="Departure Proof" className="w-5 h-5 rounded object-cover" />
+                                    <span>Departure Photo</span>
+                                    <Maximize2 size={10} className="text-emerald-600" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {(visit.completionNotes || visit.pobAmount) && (
+                              <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-1 border-t border-slate-100">
+                                {visit.pobAmount ? (
+                                  <span className="font-bold text-emerald-700">
+                                    POB Order: ₹{visit.pobAmount.toLocaleString()}
+                                  </span>
+                                ) : null}
+                                {visit.completionNotes && (
+                                  <span className="text-slate-600 truncate max-w-md">
+                                    <strong className="text-slate-700">Call Notes:</strong> {visit.completionNotes}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2 self-end md:self-center">
+                      <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                         {isPending ? (
                           <>
                             <button
@@ -784,6 +904,7 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
           onClose={() => setShowVisitsUpload(false)}
           employees={employees}
           currentUser={currentUser}
+          initialEmployeeId={currentUser.id}
           onSuccess={() => {
             setShowVisitsUpload(false);
             loadVisits();
@@ -799,6 +920,14 @@ export default function DoctorVisitPlanner({ language, currentUser, employees }:
             setShowEmployeesUpload(false);
             window.location.reload();
           }}
+        />
+      )}
+
+      {/* Lightbox Modal for Photo Inspection */}
+      {selectedPhotoData && (
+        <ImageDraggableLightboxModal
+          data={selectedPhotoData}
+          onClose={() => setSelectedPhotoData(null)}
         />
       )}
     </div>

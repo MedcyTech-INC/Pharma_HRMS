@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -67,9 +68,9 @@ export const EmployeeLocationModal: React.FC<EmployeeLocationModalProps> = ({
 
  const icon = createEmployeeLocationIcon(data.isLive, data.isCheckedIn);
 
- return (
+ const modalContent = (
   <div
-   className="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4"
+   className="fixed inset-0 z-[60] bg-slate-950/70 flex items-center justify-center p-4 overflow-hidden"
    onClick={onClose}
   >
    <div
@@ -188,4 +189,6 @@ export const EmployeeLocationModal: React.FC<EmployeeLocationModalProps> = ({
    </div>
   </div>
  );
+
+ return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };
